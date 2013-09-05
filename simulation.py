@@ -1,5 +1,8 @@
 import os, sys
 import itertools
+from Crypto.Util.number import bytes_to_long, long_to_bytes
+import puzzle; reload(puzzle); from puzzle import *;
+import signature; reload(signature); from signature import *
 
 # Parameters
 puz_params = dict(
@@ -14,16 +17,12 @@ serv_params = dict(
 
 globals().update(puz_params)
 
-# Default (degenerate) signature scheme
-def gen_keys(): return 'key0xx', 'key0xx'
-def check_signature(pubkey, message, signature): 
-    return signature == hash((pubkey,message))
-def sign_message(privkey, message): return hash((privkey,message))
-privkey, pubkey = gen_keys()
 
 # Default low-level file access
 def make_file(fname, num_blocks, block_size):
-    f = open(fname,'rb')
+    fd = os.open(fname, os.O_RDONLY | os.O_DIRECT) # Avoids filesystem cache
+    #fd = os.open(fname, os.O_RDONLY)
+    f = os.fdopen(fd, 'rb')
     def query(idx):
         assert idx < num_blocks
         f.seek(idx*block_size)
@@ -32,50 +31,23 @@ def make_file(fname, num_blocks, block_size):
         return r
     return query
 
-# Checker for our puzzle scheme
-def make_puzzle_checker(fquery, num_blocks, block_size, iters, difficulty):
-    index_from_state = lambda sol: hash(sol) % num_blocks
-    check_difficulty = lambda final, difficulty: True
-    def check(puz, solution, proof):
-        """
-        puz: puzzle identifier (just a string)
-        solution: a pubkey and a nonce
-        proof: a sequence of signatures (length: iters)
-        """
-        assert type(puz) is str
-        pubkey, nonce = solution
-        assert type(nonce) is str
+def make_PoRMiner(puzzle, sigscheme, pkey, skey):
+    index_from_state = lambda sol: hash(sol) % puzzle.num_blocks
 
-        # Requires accessing the file
-        state = '%s%s' % (puz, solution)
-        assert len(proof) == iters
-        for i,sig in enum(proof):
-            # Access the file
-            idx = index_from_state(state)
-            block = fquery(idx)
-            # Check the signature
-            if not check_signature(pubkey, block, sig): return False
-            state = puz + sig
-
-        # Final check
-        final = hash(state)
-        return check_difficulty(final, difficulty)
-
-def make_miner(pubkey, privkey, fquery, num_blocks, block_size, iters, difficulty):
-    index_from_state = lambda sol: hash(sol) % num_blocks
-    check_difficulty = lambda final, difficulty: False
-    def attempt(puz, pubkey, nonce):
-        state = '%s%s' % (puz, (pubkey, nonce))
+    def attempt(puz, nonce):
+        state = '%s:%s:%s' % (puz, pkey, nonce)
         sigs = []
-        for i in range(iters):
+        for i in xrange(puzzle.iters):
             # Access the file
             idx = index_from_state(state)
-            block = fquery(idx)
-            # Check the signature
-            sig = sign_message(privkey, (puz, nonce, block))
+            block = puzzle.fquery(idx)
+            # Sign the data
+            message = '%s:%s:%s' % (puz, nonce, block)
+            sig = sigscheme.sign(message, skey)
             sigs.append(sig)
-            state = puz + str(sig)
-        final = hash(state)
+            state = puz + nonce + sig
+
+        final = SHA.SHA1Hash(state).digest()
         return final, sigs
 
     def mine(puz, tries=None):
@@ -85,8 +57,8 @@ def make_miner(pubkey, privkey, fquery, num_blocks, block_size, iters, difficult
         for i in itertools.count() if tries is None else xrange(tries):
             if (i % 10 == 0): print("Attempt %d..." % i)
             nonce = os.urandom(20)
-            final, sigs = attempt(puz, pubkey, nonce)
-            if check_difficulty(puz, difficulty):
+            final, sigs = attempt(puz, nonce)
+            if check_difficulty(difficulty, final):
                 print("Solution found!")
                 return nonce, sigs
     return mine
@@ -105,9 +77,12 @@ def make_random_file(fname, num_bytes):
 
 ssd_fname = "random_1gb.dat"
 harddisk_fname = "/media/amiller/asus-backup-7_12/home/blockplayerdata/harddisk_1gb.dat"
-fquery = make_file(harddisk_fname, NUM_BLOCKS, BLOCK_SIZE)
-difficulty = 1.0
-miner = make_miner(pubkey, privkey, fquery, NUM_BLOCKS, BLOCK_SIZE, ITERS, difficulty)
+fquery = make_file(ssd_fname, NUM_BLOCKS, BLOCK_SIZE)
+difficulty = 32.
+sigscheme = DegenerateSignatureScheme(1024)
+puzzle = PoRPuzzle(fquery, sigscheme, NUM_BLOCKS, BLOCK_SIZE, ITERS, difficulty)
+pkey, skey = sigscheme.generate()
+miner = make_PoRMiner(puzzle, sigscheme, pkey, skey)
 
 class Streamer(object):
     """
