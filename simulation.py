@@ -6,8 +6,8 @@ import signature; reload(signature); from signature import *
 
 # Parameters
 puz_params = dict(
-    NUM_BLOCKS=1024*1024,
-    BLOCK_SIZE=1024,
+    NUM_BLOCKS=1024*1024*8*2,
+    BLOCK_SIZE=1024/2,
     ITERS=20,
     )
 
@@ -26,7 +26,12 @@ def make_file(fname, num_blocks, block_size):
     def query(idx):
         assert idx < num_blocks
         f.seek(idx*block_size)
-        r = f.read(block_size)
+        b = 0
+        r = ''
+        while b < block_size:
+            c = min(2048, block_size-b)
+            r += f.read(c)
+            b += c
         assert len(r) == block_size
         return r
     return query
@@ -42,7 +47,7 @@ def make_PoRMiner(puzzle, sigscheme, pkey, skey):
             idx = index_from_state(state)
             block = puzzle.fquery(idx)
             # Sign the data
-            message = '%s:%s:%s' % (puz, nonce, block)
+            message = '%s:%s:%s' % (puz, nonce, hash(block))
             sig = sigscheme.sign(message, skey)
             sigs.append(sig)
             state = puz + nonce + sig
@@ -75,8 +80,8 @@ def make_random_file(fname, num_bytes):
         f.write(os.urandom(b))
     print("Done")
 
-ssd_fname = "random_1gb.dat"
-harddisk_fname = "/media/amiller/asus-backup-7_12/home/blockplayerdata/harddisk_1gb.dat"
+ssd_fname = "random_8gb.dat"
+harddisk_fname = "/media/amiller/asus-backup-7_12/home/blockplayerdata/harddisk_8gb.dat"
 fquery = make_file(ssd_fname, NUM_BLOCKS, BLOCK_SIZE)
 difficulty = 32.
 sigscheme = DegenerateSignatureScheme(1024)
