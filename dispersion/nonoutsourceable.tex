@@ -1,0 +1,459 @@
+%\documentclass[conference]{IEEEtran}
+%\documentclass[onecolumn]{article}
+\documentclass{article}
+\newcommand{\IEEEproof}{\proof}
+
+\newcommand{\anote}[1]{{\color{magenta}[AM: #1]}}
+\usepackage{amsmath,amsthm,amscd,amssymb}
+\usepackage{verbatimbox}
+\usepackage{multirow}
+\usepackage{scalerel}
+\usepackage[mathletters]{ucs}
+\usepackage[utf8x]{inputenc}
+\DeclareUnicodeCharacter {9679}{\bullet}
+\DeclareUnicodeCharacter {10214}{\llbracket }
+\DeclareUnicodeCharacter {10215}{\rrbracket }
+\DeclareUnicodeCharacter {8872}{\models}
+\DeclareUnicodeCharacter {8871}{\models}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\usepackage{mathpartir}
+\usepackage{color}
+\usepackage{xspace}
+
+\usepackage{listings} %include code in your document
+\lstset{
+  breaklines=true,
+  extendedchars=true,
+}
+%\usepackage{algorithm2e}
+
+\usepackage[noend]{algpseudocode}
+
+%\lstloadlanguages{Matlab} %use listings with Matlab for Pseudocode
+%\lstnewenvironment{PseudoCode}[1][]
+%{\lstset{language=Matlab,basicstyle=\scriptsize, keywordstyle=\color{blue},numbers=left,xleftmargin=.04\textwidth,#1}}{}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\hash}{\mathcal{H}}
+\newcommand{\adv}{\mathcal{A}}
+\newcommand{\tn}{\textnormal}
+\newcommand{\unn}[1]{\uppercase\tn{#1}}
+
+\begin{document}
+
+\title{Decentralized Storage from Scratch}
+
+\maketitle
+
+\begin{abstract}
+  Bitcoin is widely regarded as the first broadly successful e-cash system. The main determinant of its success has been its attractive structure of incentives for participation that supposedly encourages ``decentralization,'' which roughly means that influence over the network (i.e., ``mining power'') tends to be dispersed among a large number of uncorrelated entities. However, to date, no model has been proposed in which ``decentralization'' can be clearly defined, which has made it difficult to evaluate whether Bitcoin's particular construction (or variations thereof) meets this goal.
+
+We first introduce a simple economic game involving two types of rational (under Cumulative Prospect Theory) agents - clients and servers - that captures an intuitive notion of ``decentralization''. We derive Bitcoin's lottery-like incentive structure as a viable solution in this model. Surprisingly, we find that Bitcoin is decentralized only when participation is {\em unprofitable} on average.
+
+Second, we find that Bitcoin's particular puzzle construction defeats the intended incentive structure; we demonstrate that the puzzle is amenable to ``outsourcing'', by which clients and servers enter into enforceable and mutually beneficial contracts, which leads to centralization. We construct a puzzle for which such contracts would inherently be unenforceable, under computational assumptions about the overhead of secure outsourcing.
+
+Finally, we show that the benefits of decentralization extend beyond dispersing compute power amongst the participants; indeed, we show that incentivizing decentralization makes BitCoin a natural resource for reliable peer-to-peer storage. Our approach is to ``graft'' a Proof-of-Retrievability scheme into the puzzle, such that finding a solution requires access to a complete file copy. This also addresses an oft-cited drawback of Bitcoin, namely that the mining operation is wasteful. The ``goldrush'' towards competitive participation has led to manufacturing investment in specialized ``mining equipment,'' which is otherwise essentially useless. Our proposed modification {\em recycles} this investment, thereby reducing the system's overall waste.
+\end{abstract}
+
+
+\section{Non-Outsourceable Puzzles}
+
+Let $Bin(n,k,p) = \sum^k_{i=0}{n \choose i}p^i(1-p)^{n-i}$ be the probability of having $k$ or fewer successes out of $n$ independent trials, each with probability $p$ (i.e., the CDF of the Binomial distribution). Also let $Bin^{-1}(k,p,z) = \displaystyle{\argmin_k}\left[Bin(n,k,p) ≤ 1-z \right]$ be the smallest number of trials needed to produce $k$ successes with at least probability $z$ (i.e., the inverse CDF of the Binomial distribution).
+
+\begin{definition}A puzzle is defined by:
+\end{definition}
+\begin{itemize}
+\item solution $← \unn{attempt}($puzid)
+\item  $\unn{verify}$(puzid, solution) ∈ \{0,1\}
+\end{itemize}
+
+satisfying the requirements for a proof-of-work, informally that
+\begin{itemize}
+\item each $\unn{attempt}()$ takes $t$ steps and has at least a $2^{-d}$ chance of success.
+\item any solver $\adv_{\unn{attempt}}()$ taking at most $qt$ steps outputs a solution with probability at most $Bin(q,1,2^{-d}) = 1-(1-2^{-d})^q$.
+\end{itemize}
+
+\begin{definition}A watermark-billable-work scheme for a puzzle consists of four functions,
+\end{definition}
+\begin{itemize}
+\item $sk,pk ← gen(d,d₀)$
+\item (bill, solution) ← $\unn{attempt\_server}($puzid, $sk$)
+\item $\unn{check\_bill}($puzid, $pk$, bill) ∈ \{0,1\}
+\item $\unn{detect\_watermark}($puzid, $pk$, solution) ∈ \{0,1\}
+\end{itemize}
+satisfying the following requirements:
+\begin{itemize}
+\item {\em (non-interference)} if $\adv_{\unn{attempt}}($puzid) (without $sk$) runs in $t$ steps, then it produces a valid solution bearing the watermark with probability strictly less than $(\frac{1}{2}-ε)2^{-d}$, where $ε>0$ is a constant.
+\item {\em (feasible)} $\unn{attempt\_server}()$ takes approximately $t$ steps and has at least a $2^{-d₀}$ chance of outputting a valid bill, and at least a $2^{-d}$ chance of outputting a valid puzzle solution.
+\item {\em (detectable)} if an adversary $\adv_{\unn{attempt\_server}}()$ takes $qt$ steps and outputs $k$ distinct bills with probability $p$, then the probability of it outputting a valid puzzle solution that {\em evades} detection is at most negligibly more than $Bin(q-t×Bin^{-1}(k,2^{-d₀},z), 1, 2^{-d})$.
+\end{itemize}
+
+\begin{definition}
+A non-outsourceable puzzle is a puzzle for which no effective watermark-billable-work scheme exists.
+\end{definition}
+
+\subsection{Bitcoin is a watermarkable puzzle}
+
+\begin{algorithmic}[0]
+  \Function{attempt}{$puzid$}
+    \State nonce ← sample random
+    \State data ← listen for valid transactions
+    \State solution ← nonce ∥ data
+    \State \Return solution
+  \EndFunction
+  \State
+
+  \Function{verify}{puzid, solution}
+    \State \Return {$\hash($puzid$ || $solution$) < 2^{-d}$}
+  \EndFunction
+\end{algorithmic}
+
+A watermark scheme for the bitcoin puzzle consists of:
+
+\begin{algorithmic}[0]
+  \State
+  \State $sk,pk$ ← gen($d,d₀$)\Comment{a signature scheme}
+  \State
+  \Function{attempt\_server}{puzid, $sk$}
+    \State nonce ← sample random
+    \State data ← listen for transactions
+    \State bill ← nonce ∥ data ∪ \{ trans. signed with sk \}
+    \State \Return (bill, bill)
+  \EndFunction
+  \State
+  \Function{check\_bill}{puzid, $pk$, bill}
+    \State \Return {$\hash($puzid$ || $bill$) < 2^{-d₀}$}
+  \EndFunction
+  \State
+  \Function{detect}{puzid, $pk$, solution}
+     \State nonce ∥ data ← solution
+     \State check that data contains a $pk$ signature
+  \EndFunction
+\end{algorithmic}
+
+\subsection{A Zero Knowledge variation of the Bitcoin puzzle is not watermarkable}
+
+Assume we have a NIZK scheme for arbitrary circuits that is computationally sound and statistically zero-knowledge (in security parameter λ).
+
+\begin{algorithmic}[0]
+ \State
+ \Function{C}{(puzid, $m'$), (nonce, $m$, chk)}
+   \State assert $\hash($puzid ∥ nonce ∥ $m) < 2^{-d}$
+   \State assert $m ⊕ m' =$ chk
+ \EndFunction
+ \State
+ \Function{attempt}{puzid}
+   \State nonce ← sample random
+   \State $m$ ← listen for valid transactions
+   \State π ← prove \Call{C}{(puzid, $m$), (nonce, $m$, $0^{|m|}$)}
+   \Comment{hiding (nonce, $m, 0^{|m|}$)}
+   \State \Return (π, $m$)
+ \EndFunction
+ \State
+ \Function{verify}{puzid, solution}:
+    \State (π, $m$) ← solution
+    \State check that π proves $C(($puzid, $m), \cdot)$
+ \EndFunction
+\end{algorithmic}
+
+\begin{theorem}
+The above scheme is non-outsourceable.
+\end{theorem}
+\IEEEproof 
+Suppose for contradiction the existence of functions $\unn{attempt\_server}$, $\unn{check\_bill}$, and $\unn{detect}$ satisfy the {\em feasible} and {\em detectable} properties of a watermark-billable-work scheme. We will prove they violate the {\em non-interference} property by constructing an $\adv_{\unn{attempt}}$ that runs in $t$ steps and finds a detectable solution with probability arbitrarily close to $2^{-d}$. In fact the construction is simply $\adv_{\unn{attempt}}($puzid$) = \unn{attempt}($puzid$)$. In order to show that $\unn{attempt}$ finds detectable solutions with sufficient probability, we apply the extractability of the NIZK scheme to $\adv_{\unn{attempt\_server}}$ and construct an intermediate $\adv'$, which we then show is indistinguishable from $\unn{attempt}$ by the statistical hiding property of the NIZK.
+\begin{algorithmic}[0]
+  \State
+  \Function{$\adv'$}{puzid, $sk$}
+     \State $(π', m') ← \adv_{\unn{attempt\_server}}($puzid, $sk$)
+     \State (nonce, $m) ← \mathcal{E}_{\adv_{\unn{attempt\_server}}}$($π'$, (puzid, $sk$))
+     \State π ← prove \Call{C}{(puzid, $m$), (nonce, $m$, $0^{|m|}$)}
+     \State \Return (π, $m$)
+  \EndFunction
+\end{algorithmic}
+Notice that $\adv'$ and $\unn{attempt}$ differ only in their witnesses.
+\qed
+
+
+
+\section{Conclusion}
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{dispersion}
+
+
+\appendix
+
+\end{document}
+
+
+\section{Introduction}
+
+The challenge is twofold: (1) as the protocol is open to the
+public, we cannot rely on strong pre-established identities associated
+uniquely to each user (which would simplify the matter and is the
+standard model in distributed computing); and (2) due to economies of
+scale, computational tasks are generally performed more efficiently
+when resources are aggregated rather than dispersed. 
+
+To address (1), we adapt a technique pioneered by Bitcoin: our
+mechanism takes the form of a computational puzzle-solving
+competition. We design the puzzle in such a way that it can be solved
+most effectively only by 
+correctly following the protocol (i.e., by storing the correct
+data). 
+
+The second aspect of the challenge is more difficult. We must
+essentially {\em prevent outsourcing}. Our approach is motivated by
+the observation that customers do not inherently *trust* the cloud
+service provider, but rather delegate responsibility to the 
+service provider only when it is efficient to enforce contracts to
+that effect. Thus we would aim for a puzzle-competition protocol that
+precludes the existence of a side-protocol by which a service provider
+can prove to a client (or, perhaps more importantly, a judge or other
+third party) that it is doing the puzzle-solving work that benefits the 
+client. This approach seems likely to be thwarted, however, by recent
+results on efficient private and verifiable computation for arbitrary
+computations. We will proceed by supposing the existence of a poly-log
+lower bound for the prover efficiency (i.e., the service providers
+costs) of outsourced computation. We then adapt an approach based on
+{\em signets}~\cite{signets}, such that any {\em easier} method of
+outsourcing (short of universal outsourcing) makes the client
+vulnerable to the server --- if the client trusts the service provider
+with its computation, it also trusts the service provider with the
+monetary reward.
+
+\subsection{How Bitcoin Works}
+
+Brief overview, include links to Bitcoin primer, Bitter-to-Better, Kroll and Felten, etc.
+
+\subsection{Proof-of-Work and Hashcash}
+
+\subsection{General Structure of Puzzle Competitions}
+
+The general protocol structure we’ve discussed involves having a
+trusted central party generate and publish a puzzle description in
+each epoch. The participants try to find compute solutions to send to
+the central party; the first participant to find a solution earns a
+reward and the epoch ends.
+\newline
+\newline
+
+%% \begin{algorithm}[h]
+%%  \SetKwFunction{KwVerify}{scratch\_off}
+%%  \SetKwFunction{KwSolve}{solve}
+%%  $F_1,...F_n$ are the blocks of the $n$-block file we want stored\;
+%%  $puz ← \tn{gen\_puz}(F, λ, \tn{epoch})$\;
+%%  $pk,sk$ ← gen\_key()\;
+%%   \KwSolve{puz}{
+%%    \While{not solved}{
+%%      nonce ← draw\_ticket($puz,pk$)\;
+%%      \If{scratch\_off(nonce,λ) is valid}{
+%%        this is a winner
+%%      }
+%%    }
+%%  }
+%%  \caption{General form of puzzle}
+%% \end{algorithm}
+
+
+\section{Economic Model}
+
+Our economic model is intended to provide a workable definition of ``decentralization,'' the defining characteristic of Bitcoin's design objectives. 
+
+Our high-level model involves a game played by a population of
+rational agents. Each participant decides how much money to invest and how to allocate it. 
+Monetary rewards are disbursed to agents to encourage (correct) participation.  
+The agents decide how to participate based on rational decision making (i.e., based on ordinal preference relations), and how to allocate computational resources.
+
+\subsection{Cumulative Prospect Theory, Rationality of Gambling}
+
+This is a model for rational behavior that accounts for why people play casino games and purchase lottery tickets.\cite{cpt}, \cite{cptaxiomatization}.
+
+Relationship with Expected Utility, traditional model of rationality.
+
+Three axioms 
+
+Regressivity of lotteries, evidence from powerball \cite{powerball}
+
+Empirical evidence for the shape of the weighting function ~\cite{gonzalez1999shape}.
+A typical weighting function is given by Prelec ~\cite{prelec1998probability}, $w(p) = w⁺(p) + w⁻(p)$, where
+
+\begin{equation}
+  w⁺(p) = exp[-β⁺(-ln(p))^α]
+\end{equation}
+and
+\begin{equation}
+  w⁻(p) = exp[-β⁻(-ln(p))^α].
+\end{equation}
+
+This particular form satisfies additional axioms that refine CPT, specifically compound invariance~\cite{prelec1998probability}.
+
+\subsection{Decentralization Lottery Game}
+
+We model participation in Bitcoin by a game involving two types of players, {\em clients} and {\em servers}. The game represents a fixed interval of time (e.g., one week), during which each player decides how much money to invest in Bitcoin mining.
+We assume that servers are risk-neutral and profit-maximizing (i.e., with a linear utility function and no probability distortion).
+Clients are assumed to have functions of the typical shape (i.e., S-shaped probability weighting function that overweights unlikely events and underweights near-certain events).
+
+However, in order to model economies of scale and the trend of cloud computing, we assume that the servers enjoy a cheaper price per unit of computation than the clients, parameterized by a constant factor, ρ.
+
+Determine the protocol design by a prize amount $P$ and probability $E$.
+Let $I$
+
+\begin{theorem}
+  For any valid parameters, $α, β⁺, β⁻$, characterizing the preference of the clients, there exists a lottery prize $P$ large enough that a unique Nash equilibrium exists such that the clients invest $X$ in mining.
+\end{theorem}
+\IEEEproof assumed \qed.
+
+Let $C_S$ be the amount of computational power invested by the servers, and $C_C$ be the amount invested by the clients. Let $P$ be the prize amount, and $E$ is the average time between epochs, and let $z$ be a bounded time of an interval during which decisions are made. The benefit of investing marginally additional more computing power must be equal to the marginal benefit 
+
+
+
+
+
+
+\subsection{Hosted Mining Protocol}
+
+Protocol for hosted mining with ordinary Bitcoin.
+
+A puzzle could be made that would allow an outsourcing arrangement to work even better. Under the current scheme, it is possible for the server to withhold winning solutions. This may not be significant enough concern to discourage outsourcing, since there is apparently no incentive for service provider to do so. Nevertheless, we may construct a puzzle consisting of two phases, which has essentially the same effectiveness, yet allows the client to unblind each partial solution as a fair attempt.
+
+%% \begin{algorithm}[h]
+%%   \DontPrintSemicolon
+%%   \SetKwFunction{KwCheck}{verify}
+%%   \SetKwFunction{KwScratch}{scratch\_off}
+%% \KwScratch{prevblock,nonce,data}{:\;
+%% \quad  $root ← \hash(data)$\;
+%% \quad  $h ← \hash(prevblock ∥ root ∥ nonce)$\;
+%% \quad  \Return $h < 2^{-d}$
+%% }\;
+
+%% \KwCheck{prevblock,solution}{
+%%   \;
+%% }\;
+%%    \caption{Standard bitcoin puzzle}
+%% \end{algorithm}
+
+\subsection{Strawman Non-Outsourceable Puzzle }
+We can design a puzzle where the receipt of the reward is bound after the puzzle. This allows the miner to steal the puzzle. However even if the reward can be stolen, stealing the reward is detectable. It would be possible, for example, for the service provider to post an insurance bond that will be automatically paid out if it is caught.
+
+\subsection{Non-Outsourceable Puzzle}
+
+
+\section{Grafted Proof-of-Storage Puzzle}
+
+We discuss techniques for the {\em crowdsourcing} of
+storage. While {\em outsourcing} is a popular approach for reducing
+costs by exploiting economies of scale and amortization, our 
+primary goal is fault tolerance by replicating storage to devices that
+are maximally dispersed, both spatially and administratively.
+Previous work has focused on enabling service providers to prove they
+replicate data across multiple hard drives, thus defending against
+random device failures. However, this does not defend against
+correlated failures of multiple drives, such as a data-center fire, or
+a the service provider going bankrupt. Our goal is to achieve the
+replication of
+storage across as many independent administrative domains as possible,
+and thereby enjoy minimal correlation of failures. Our approach,
+inspired by Bitcoin, is to construct a mechanism for rewarding
+participation, such that many individual
+users are incentivised to participate (and participate correctly).
+
+\subsection{Proof-of-Retrievability}
+
+\subsection{Grafted Proof-of-Retrievability Puzzle}
+
+This is a construction that leads to a poor outcome
+  where the rational agents just pay a central server to do all of the
+  work and they proportionally receive the benefit. This resembles
+  the current Bitcoin puzzle, except based on a proof of retrievability.
+
+%% \begin{algorithm}[h]
+%%  $F_1,...F_n$ are the blocks of the $n$-block file we want stored\;
+%%  $puz ← \tn{gen\_puz}(F, λ, \tn{epoch})$\;
+%%  $pk,sk$ ← gen\_key()\;
+%%  $λ₁+λ₂ = λ$ are outsource parameters chosen by the client\;
+%%  \While{not solved}{
+%%    nonce ← draw\_ticket($puz,pk$)\;
+%%    $q_1,...q_d ← $gen\_challenge($puz$,nonce)\;
+%%    $w₁ ← \hash(puz ∥ \tn{nonce} ∥ F_{q_1} ∥ ... ∥ F_{q_d}) ∈ [0,1]$ \;
+%%    $w₂ ← sign(sk, (puz ∥ \tn{nonce}))$ \;
+%%    \If{$w₁ < 2^{-λ₁}$ and $w₂ < 2^{-λ₂}$}{
+%%      this is a winner\;
+%%      transmit $w₂$ and nonce\;
+%%    }
+%%  }
+%%  \caption{Strawman puzzle for which there exists an efficient
+%%    publicly verifiable outsourcing contract}
+%% \end{algorithm}
+
+
+\section{Implementation and Evaluation}
+
+We implemented a proof of concept of a hosted Bitcoin mining system. This allows a server to prove to a client that it is doing work that can only benefit the client.
+
+We implemented the repaired  proof 
+
+
+
+
+
+
+
+\subsection{RSA-Hourglass PoR Puzzle for Dispersed Computation}
+
+%% \begin{algorithm}[h]
+%%  $F_1,...F_n$ are the blocks of the $n$-block file we want stored\;
+%%  $puz ← \tn{gen\_puz}(F, λ, \tn{epoch})$\;
+%%  $pk,sk$ ← gen\_key()\;
+%%  $G_1,...,G_n$ are watermark-encoded blocks with $sk$\;
+%%  $H_1,...,H_n$ are made by applying inverse RSA to $G$ with trapdoor $sk$\;
+%%  \While{not solved}{
+%%    nonce ← draw\_ticket($puz,pk$)\;
+%%    $q_1,...q_d ← \tn{gen\_challenge}(puz,\tn{nonce})$\;
+%%    $w ← \hash(puz ∥ \tn{nonce} ∥ H_{q_1} ∥ ... ∥ H_{q_d}) ∈ [0,1]$ \;
+%%    \If{$w < 2^{-λ}$}{
+%%      this is a winner\;
+%%      transmit $pk$ and a zk proof that $H_{q_i}$ is constructed
+%%      correctly (without revealing $sk$, i.e., $G$)\;
+%%    }
+%%  }
+%%  \caption{Strawman puzzle for which there exists an efficient
+%%    publicly verifiable outsourcing contract}
+%% \end{algorithm}
+
+\section{Partial and Unlinkable PoR Puzzle}
+
+The goal of the partial and unlinkable puzzle is to allow an
+individual participant with less than the capacity to store the entire
+file to select only a subset of the blocks and store those. However,
+the winning puzzle solution shouldn't be linkable to the particular
+subset; as otherwise, to maintain privacy, the participant would have
+to download a different subset immediately after winning.
+
+%% \begin{algorithm}[h]
+%%  $F_1,...F_n$ are the blocks of the $n$-block file we want stored\;
+%%  $puz ← \tn{gen\_puz}(F, λ, \tn{epoch})$\;
+%%  $pk,sk$ ← gen\_key()\;
+%%  player selects a private identity (random seed) $a$\;
+%%  secret PRF is $g_a(j) = f_a(j) \mod n = (j^a \mod p) \mod n$\;
+%%  at setup, player stores $F_{g_a(2)} … F_{g_a(k+1)}$\;
+%%  \While{not solved}{
+%%    nonce ← random()\;
+%%    $Y ← (g^a \ h^\tn{nonce})$\;
+%%    $c_1,...c_d ← $ draw $d$ random elements $∈ 1...k$ using $Y$ as seed\;
+%%    $q_1,...q_d ← g_a(c_1),...g_a(c_d)$\;
+%%    $w ← \tn{zk\_sign}(sk, (puz ∥ \tn{nonce} ∥ F_{q_1} ∥ ... ∥ F_{q_d}))$\;
+%%    \If{$w < 2^{-λ}$}{
+%%      this is a winner\;
+%%      transmit zk proof that $c$ matches $q$\;
+%%    }
+%%  }
+%% \caption{Partial and unlinkable PoR puzzle}
+%% \end{algorithm}
+
