@@ -149,16 +149,15 @@ Assume we have a NIZK scheme for arbitrary circuits that is computationally soun
 
 \begin{algorithmic}[0]
  \State
- \Function{C}{(puzid, $m'$), (nonce, $m$, chk)}
-   \State assert $\hash($puzid ∥ nonce ∥ $m) < 2^{-d}$
-   \State assert $m ⊕ m' =$ chk
+ \Function{C}{(puzid, $m$), (nonce, $m'$)}
+   \State assert $\hash($puzid ∥ nonce ∥ $m⊕m') < 2^{-d}$
  \EndFunction
  \State
  \Function{attempt}{puzid}
    \State nonce ← sample random
    \State $m$ ← listen for valid transactions
-   \State π ← prove \Call{C}{(puzid, $m$), (nonce, $m$, $0^{|m|}$)}
-   \Comment{hiding (nonce, $m, 0^{|m|}$)}
+   \State π ← prove \Call{C}{(puzid, $m$), (nonce, $0^{|m|}$)}
+   \Comment{hiding (nonce, $0^{|m|}$)}
    \State \Return (π, $m$)
  \EndFunction
  \State
@@ -178,7 +177,7 @@ Suppose the existence of functions $\unn{attempt\_server}$, $\unn{check\_bill}$,
   \Function{$\adv'$}{puzid, $sk$}
      \State (bill, $(π', m')) ← \adv_{\unn{attempt\_server}}($puzid, $sk$)
      \State (nonce, $m) ← \mathcal{E}_{\adv_{\unn{attempt\_server}}}$($π'$, (puzid, $sk$))
-     \State π ← prove \Call{C}{(puzid, $m$), (nonce, $m$, $0^{|m|}$)}
+     \State π ← prove \Call{C}{(puzid, $m$), (nonce, $m⊕m'$)}
      \State \Return (bill, $(π, m))$
   \EndFunction
 \end{algorithmic}
