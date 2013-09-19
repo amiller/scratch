@@ -63,20 +63,27 @@ Finally, we show that the benefits of decentralization extend beyond dispersing 
 
 \section{Non-Outsourceable Puzzles}
 
+We give a definition for a lottery-like computational {\em puzzle} that is solvable with computational work; however the probability of success, given any number of steps $t$, is bounded tightly to $t$ and is consistent with brute force guesses of witnesses. After solving a puzzle, the solver is able to use the witness as a private key to sign an unforgeable message that claims or spends a reward. 
+
+We'd like for clients to solve puzzles themselves, rather than paying servers do it for them. Our approach is to make it difficult to delegate the puzzle securely. A {\em watermarked billable-work} protocol for a puzzle captures a notion of an enforceable contract between a server and client that would enable them to make a secure yet mutually beneficial arrangement. A client is willing to pay a low-variance price in exchange for puzzle-solving work, where such work leads to a fair but high-variance payoff distribution. The server prefers low-variance payoff overall; regardless of the actual payoff (whether a solution was found), the server would like to send the client a bill based on computational resources consumed. We assume that if the server solves the puzzle, it learns the witness - this is because the overhead of universal private outsourcing is high. Even if the server learns the witness, it may be prevented from stealing the reward (or doing anything else undesirable to the client) by other means. In particular, if the server's work can be watermarked such that any misuse of the witness would be a detectable breach of contract, the client may be rely on legal recourse.
+
+Since we want to discourage outsourcing, we want to design a puzzle that does not admit such a protocol. Below we give a more formal definition of the puzzle and watermarked billable-work protocol.
+
 Let $Bin(n,k,p) = \sum^k_{i=0}{n \choose i}p^i(1-p)^{n-i}$ be the probability of having $k$ or fewer successes out of $n$ independent trials, each with probability $p$ (i.e., the CDF of the Binomial distribution). Also let $Bin^{-1}(k,p,z) = \displaystyle{\argmin_k}\left[Bin(n,k,p) ≤ 1-z \right]$ be the smallest number of trials needed to produce $k$ successes with at least probability $z$ (i.e., the inverse CDF of the Binomial distribution).
 
-\begin{definition}A puzzle is defined by:
+\begin{definition}A puzzle scheme consists of two functions:
 \end{definition}
 \begin{itemize}
 \item solution $← \unn{attempt}($puzid)
 \item  $\unn{verify}$(puzid, solution) ∈ \{0,1\}
 \end{itemize}
 
-satisfying the requirements for a proof-of-work, informally that
+satisfying the requirements for a proof-of-work lottery, informally that
 \begin{itemize}
 \item each $\unn{attempt}()$ takes $t$ steps and has at least a $2^{-d}$ chance of success.
-\item any solver $\adv_{\unn{attempt}}()$ taking at most $qt$ steps outputs a solution with probability at most $Bin(q,1,2^{-d}) = 1-(1-2^{-d})^q$.
+\item any arbitrary program $\adv_{\unn{attempt}}()$ taking at most $qt$ steps outputs a solution with probability at most $Bin(q,1,2^{-d}) = 1-(1-2^{-d})^q$.
 \end{itemize}
+
 
 \begin{definition}A watermark-billable-work scheme for a puzzle consists of four functions,
 \end{definition}
@@ -88,9 +95,9 @@ satisfying the requirements for a proof-of-work, informally that
 \end{itemize}
 satisfying the following requirements:
 \begin{itemize}
-\item {\em (non-interference)} if $\adv_{\unn{attempt}}($puzid) (without $sk$) runs in $t$ steps, then it produces a valid solution bearing the watermark with probability strictly less than $(\frac{1}{2}-ε)2^{-d}$, where $ε>0$ is a constant.
-\item {\em (feasible)} $\unn{attempt\_server}()$ takes approximately $t$ steps and has at least a $2^{-d₀}$ chance of outputting a valid bill, and at least a $2^{-d}$ chance of outputting a valid puzzle solution.
-\item {\em (detectable)} if an adversary $\adv_{\unn{attempt\_server}}()$ takes $qt$ steps and outputs $k$ distinct bills with probability $p$, then the probability of it outputting a valid puzzle solution that {\em evades} detection is at most negligibly more than $Bin(q-t×Bin^{-1}(k,2^{-d₀},z), 1, 2^{-d})$.
+\item {\em (non-interference)} if an arbitrary adversary $\adv_{\unn{attempt}}($puzid) (without $sk$) runs in $t$ steps, then it produces a valid solution bearing the watermark with probability strictly less than $(1-ε)2^{-d}$, where $ε>0$ is a constant.
+\item {\em (feasible)} $\unn{attempt\_server}()$ takes $t$ steps and has at least a $2^{-d₀}$ chance of outputting a valid bill, and at least a $2^{-d}$ chance of outputting a valid puzzle solution.
+\item {\em (detectable)} if an arbitrary adversary $\adv_{\unn{attempt\_server}}()$ takes $qt$ steps and outputs a bill with probability $z$, then the probability of it outputting a valid puzzle solution that {\em evades} detection  (without the watermark) is at most $negl(λ)$ more than $Bin(q-t×Bin^{-1}(k,2^{-d₀},z), 1, 2^{-d})$.
 \end{itemize}
 
 \begin{definition}
@@ -165,22 +172,21 @@ Assume we have a NIZK scheme for arbitrary circuits that is computationally soun
 The above scheme is non-outsourceable.
 \end{theorem}
 \IEEEproof 
-Suppose for contradiction the existence of functions $\unn{attempt\_server}$, $\unn{check\_bill}$, and $\unn{detect}$ satisfy the {\em feasible} and {\em detectable} properties of a watermark-billable-work scheme. We will prove they violate the {\em non-interference} property by constructing an $\adv_{\unn{attempt}}$ that runs in $t$ steps and finds a detectable solution with probability arbitrarily close to $2^{-d}$. In fact the construction is simply $\adv_{\unn{attempt}}($puzid$) = \unn{attempt}($puzid$)$. In order to show that $\unn{attempt}$ finds detectable solutions with sufficient probability, we apply the extractability of the NIZK scheme to $\adv_{\unn{attempt\_server}}$ and construct an intermediate $\adv'$, which we then show is indistinguishable from $\unn{attempt}$ by the statistical hiding property of the NIZK.
+Suppose the existence of functions $\unn{attempt\_server}$, $\unn{check\_bill}$, and $\unn{detect}$ satisfy the {\em feasible}, {\em detectable}, and {\em non-interference} properties of a watermark-billable-work scheme. We will show a contradiction by constructing a witness distinguisher for the NIZK scheme. First we note that $\unn{attempt}($puzid$)$ runs in $t$ steps, and therefore by {\em non-interference} produces a detectable solution with probability less than $(1-ε)2^{-d}$. Next we apply the extractability of the NIZK scheme to $\adv_{\unn{attempt\_server}}$ and construct an alternate $\adv'$, which we then show is distinguishable from $\adv_{\unn{attempt}}$ yet differs only in its (hidden) witness.
 \begin{algorithmic}[0]
   \State
   \Function{$\adv'$}{puzid, $sk$}
-     \State $(π', m') ← \adv_{\unn{attempt\_server}}($puzid, $sk$)
+     \State (bill, $(π', m')) ← \adv_{\unn{attempt\_server}}($puzid, $sk$)
      \State (nonce, $m) ← \mathcal{E}_{\adv_{\unn{attempt\_server}}}$($π'$, (puzid, $sk$))
      \State π ← prove \Call{C}{(puzid, $m$), (nonce, $m$, $0^{|m|}$)}
-     \State \Return (π, $m$)
+     \State \Return (bill, $(π, m))$
   \EndFunction
 \end{algorithmic}
-Notice that $\adv'$ and $\unn{attempt}$ differ only in their witnesses.
+ \anote{Assume that extraction preserves exactly the number $t$ of steps (not just polynomially related).}  $\adv'$ also takes $t$ steps, and outputs a bill (and/or a solution) whenever $\adv_{\unn{attempt\_server}}($puzid, $sk)$ does. Because $\adv'$ is {\em feasible}, it outputs a solution with probability $2^{-d}$; since it is {\em detectable}, it outputs a watermarked solution with similar probability. Therefore $\unn{detect\_watermark}$ can be used to distinguish between $\unn{attempt}$ and $\adv'$ with advantage $ε$. But $\adv'$ differs from only $\adv_{\unn{attempt}}$ in the choice of witness, so the distinguisher violates the statistical zero-knowledge property of the NIZK.
 \qed
 
 
 
-\section{Conclusion}
 
 
 \bibliographystyle{IEEEtran}
