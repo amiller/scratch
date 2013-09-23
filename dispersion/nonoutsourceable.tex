@@ -15,11 +15,18 @@
 \DeclareUnicodeCharacter {10215}{\rrbracket }
 \DeclareUnicodeCharacter {8872}{\models}
 \DeclareUnicodeCharacter {8871}{\models}
+
 \newtheorem{proposition}{Proposition}
-\newtheorem{definition}{Definition}
 \newtheorem{corollary}{Corollary}
 \newtheorem{lemma}{Lemma}
 \newtheorem{theorem}{Theorem}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
 \usepackage{mathpartir}
 \usepackage{color}
 \usepackage{xspace}
@@ -31,6 +38,7 @@
 }
 %\usepackage{algorithm2e}
 
+\usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
 
 %\lstloadlanguages{Matlab} %use listings with Matlab for Pseudocode
@@ -38,12 +46,13 @@
 %{\lstset{language=Matlab,basicstyle=\scriptsize, keywordstyle=\color{blue},numbers=left,xleftmargin=.04\textwidth,#1}}{}
 
 \DeclareMathOperator*{\argmax}{arg\,max}
-\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\ArgMin}{arg\,min}
+\newcommand{\argmin}[1]{\displaystyle{\ArgMin_{#1}}}
 \newcommand{\hash}{\mathcal{H}}
-\newcommand{\adv}{\mathcal{A}}
+\newcommand{\Adv}{\mathcal{A}}
 \newcommand{\tn}{\textnormal}
 \newcommand{\unn}[1]{\uppercase\tn{#1}}
-
+\newcommand{\samples}{\overset{\$}{←}}
 \begin{document}
 
 \title{Decentralized Storage from Scratch}
@@ -60,29 +69,187 @@ Second, we find that Bitcoin's particular puzzle construction defeats the intend
 Finally, we show that the benefits of decentralization extend beyond dispersing compute power amongst the participants; indeed, we show that incentivizing decentralization makes BitCoin a natural resource for reliable peer-to-peer storage. Our approach is to ``graft'' a Proof-of-Retrievability scheme into the puzzle, such that finding a solution requires access to a complete file copy. This also addresses an oft-cited drawback of Bitcoin, namely that the mining operation is wasteful. The ``goldrush'' towards competitive participation has led to manufacturing investment in specialized ``mining equipment,'' which is otherwise essentially useless. Our proposed modification {\em recycles} this investment, thereby reducing the system's overall waste.
 \end{abstract}
 
+\section{Scratch-Off Puzzles}
 
-\section{Non-Outsourceable Puzzles}
+Scratch-off puzzles are moderately hard computational puzzles, used for constructing scratch-off lotteries. They are similar to proof-of-work puzzles and client puzzles, but differ in two ways: first, the puzzle should admit concurrent work, such that even a small amount of computation leads to a proportional chance of success; second, solving a scratch-off puzzle entitles the solver to associate a message with the solution. Associating a message with a solution allows the solver to claim or spend a reward. Our definition is adapted from the client-puzzles in \cite{chen2009security,stebila2011stronger}.
 
-We give a definition for a lottery-like computational {\em puzzle} that is solvable with computational work; however the probability of success, given any number of steps $t$, is bounded tightly to $t$ and is consistent with brute force guesses of witnesses. After solving a puzzle, the solver is able to use the witness as a private key to sign an unforgeable message that claims or spends a reward. 
+Let $ε_{d,k,n} : ℕ → \left[0,1\right]$ and $ω_{d,k} : ℕ → \left[0,1\right]$ be a family of functions, which will bound from below (resp., from above) the probability of puzzle-solving success from concurrent attempts by honest parties (resp., attempts by the adversary), where $d$ is a difficulty parameter, $k$ is a security parameter, and $n$ is a number of distinct puzzles.
 
-We'd like for clients to solve puzzles themselves, rather than paying servers do it for them. Our approach is to make it difficult to delegate the puzzle securely. A {\em watermarked billable-work} protocol for a puzzle captures a notion of an enforceable contract between a server and client that would enable them to make a secure yet mutually beneficial arrangement. A client is willing to pay a low-variance price in exchange for puzzle-solving work, where such work leads to a fair but high-variance payoff distribution. The server prefers low-variance payoff overall; regardless of the actual payoff (whether a solution was found), the server would like to send the client a bill based on computational resources consumed. We assume that if the server solves the puzzle, it learns the witness - this is because the overhead of universal private outsourcing is high. Even if the server learns the witness, it may be prevented from stealing the reward (or doing anything else undesirable to the client) by other means. In particular, if the server's work can be watermarked such that any misuse of the witness would be a detectable breach of contract, the client may be rely on legal recourse.
+\begin{definition}A scratch-off puzzle consists of two functions:
+\begin{itemize}
+\item $π ← \unn{scratch}(puz, m)$
+\item  $\unn{verify}(puz, π, m) ∈ \{0,1\}$
+\end{itemize}
+
+satisfying the following properties:
+\begin{itemize}
+\item {\em (ω-Concurrent)} $\unn{scratch}(\cdot)$ is a probabilistic algorithm that takes at most $t₀$ steps. For any number $n$, and sequence of messages $\{m₁,m₂,...,m_n\}$, then the output of $n$ concurrent attempts, $π_i ← \unn{scratch}(puz,m_i)$ for $1 ≤ i ≤ n$, contains a winning solution (i.e., there exists an $\hat{i}$ such that $\unn{verify}(puz,π_{\hat i},m_{\hat i})$) with at least probability $ω_{d,k}(n)$.
+
+\item {\em (ε-Strong)} Let $\{(puz₁,m₁),...,(puz_q,m_q)\}$ be an arbitrary sequence of messages and puzzles. Let $\Adv$ be an arbitrary adversary with unbounded oracle access to $\unn{scratch}(puz_i, m_i), 1 ≤ i ≤ q$, and at most $t$ additional steps. Then $\Adv$ computes $n$ solutions to distinct puzzles, $\{puz'₁,...,puz'_n\}$, with designated messages $\{m'₁,...,m'_m\}$, such that $∀(i,j)$, $(puz_i,m_i)≠(puz'_j,m'_j)$, with probability at most $ε_{d,k,n}(t)$.
+
+\end{itemize}
+\end{definition}
+
+\begin{remark}
+The ε-strong condition resembles non-malleability in digital signatures. It captures the property that the adversary cannot reuse the output of honest participants in order to more easily find a solution for a message of its choice.
+\end{remark}
+
+\begin{definition}A strong scratch-off puzzle satisfies the following condition on $ε$:
+\begin{itemize}
+  \item $|ε_{d,k,n}(t) - ε_{d,k,1}(t/n)| ≤ negl(k,d)$
+\end{itemize}
+\end{definition}
+
+\begin{remark}
+This captures the property that solving several puzzles is not easier or amortizable compared to solving a single puzzle.
+\end{remark}
+
+\begin{definition}A concurrent scratch-off puzzle satisfies the following condition on $ω$:
+\begin{itemize}
+  \item $|ω_{d,k}(n) - (1-(1-ω_{d,k}(1))^n)| ≤ negl(k,d)$
+\end{itemize}
+\end{definition}
+
+\begin{remark}
+This captures the property that $n$ independent concurrent scratch-off attempts each contribute an approximately equal chance of winning. The negligible difference accounts for the possibility that concurrent attempts may draw the same random coins twice.
+\end{remark}
+
+\subsection{Bitcoin is a scratch-off puzzle}
+
+The Bitcoin puzzle scheme is as follows:
+\begin{algorithmic}[0]
+  \Function{attempt}{$puz,m$}
+    \State nonce $\samples \{0,1\}^k$
+    \State π ← nonce ∥ $m$
+    \State \Return π
+  \EndFunction
+  \State
+  \Function{verify}{$puz, π$}
+    \State \Return {$\hash(puz || π) < 2^{-d}$}
+  \EndFunction
+\end{algorithmic}
+
+\anote{todo: give the specific function families $ε$ and $ω$ that it satisfies}
+
+
+\section{Storage Puzzles}
+
+A storage puzzle is a variation of a scratch-off puzzle with an embedded proof-of-retrievability. Each scratch-off attempt requires accessing random blocks of an encoded file. If an adversary attempts to solve the puzzle while only storing a corrupt or incomplete file, it will have to abort many of its scratch-off attempts, lowering its overall effectiveness. We formalize this by relating the probability of extraction (i.e., successfully recovering the entire file from oracle transcripts) to the probability of computing a puzzle solution in $t$ steps.
+
+\begin{definition} A storage puzzle is a scratch-off puzzle satisfying the following property:
+\begin{itemize}
+\item (extractable) If an adversary $\Adv$ runs in $t$ steps and produces a puzzle solution with probability $p$, then the file $F$ can be reconstructed with probability $γ_{d,k}(t)$.
+\end{itemize}
+\end{definition}
+\anote{Need to clarify the shape of $γ$.}
+
+\subsubsection{A Storage Puzzle}
+
+The following is a storage puzzle:
+
+\begin{algorithmic}[0]
+ \State $F_1,...F_n$ are the $n$ blocks of a file $F$ we want stored
+ \State $H_1,...H_n$ are ECC-encoded file blocks of $F$ such that the file can be reconstructed from any $αn$ blocks.
+ \Function{attempt}{$puz,m$}
+   \State nonce $\samples \{0,1\}^k$
+   \State $q_0 ← \hash(puz ∥ 0 ∥ $nonce$ ∥ m)$
+   \For{$i ← 1$ to $ℓ$}
+      \State $b_i ← H_{q_{i-1} \mod n}$
+      \State $q_i ← \hash(puz ∥ i ∥ $nonce$ ∥ b_i)$
+   \EndFor
+   \State \Return $\{q_0,...,q_ℓ\}, $nonce
+  \EndFunction
+\end{algorithmic}
+\anote{I need to do the calculation for this, as a function of $\Adv$'s number of steps, the number of iterations and error correction parameters.}
+
+
+\section{Preventing Outsourced Puzzle Solving}
+
+We'd like for clients to solve puzzles themselves, rather than paying servers do it for them. Our approach is to make it difficult to delegate the puzzle securely.
+
+\subsection{Stealable Puzzles}
+
+A {\em billable-work} protocol for a scratch-off puzzle captures the notion of an enforceable contract between a server and a client that would enable them to make a mutually beneficial arrangement. A client is willing to pay a low-variance price in exchange for puzzle-solving work, where such work leads to a high-variance payoff distribution. The server prefers low-variance payoff overall; regardless of the outcome of the work (whether a  solution was found), the server would like to send the client a bill based on computational resources consumed. A billable work scheme is secure if the server can not present bills to the client while reusing the work for its own purposes.
+
+\begin{definition}A billable-work scheme for a puzzle consists of four functions,
+\begin{itemize}
+\item $sk,pk ← gen(d,d₀,m)$
+\item (bill, π) ← $\unn{attempt\_server}(puz, sk)$
+\item $\unn{check\_bill}(puz, pk, $bill$) ∈ \{0,1\}$
+\end{itemize}
+satisfying the following requirements:
+\begin{itemize}
+\item {\em (feasible)} $\unn{attempt\_server}()$ takes $t₀$ steps and has at least a $ω_{d₀,k}(1)$ chance of outputting a valid bill, and at least a $ω_{d,k}(1)$ chance of outputting a valid puzzle solution associated with $m$.
+\item {\em (non-stealable)} if an arbitrary adversary $\Adv_{\unn{attempt\_server}}()$ takes $t$ steps and outputs a bill with probability $z$, then the probability of it outputting a valid puzzle solution for $m'≠m$ (i.e., stolen work) is at most $ε_{d,k,1}(t - ε^{-1}_{d₀,k,1}(z))$ (where $ε^{-1}_{d,k,n}(z) = \argmin{t}(ε_{d,k,n}(t) ≥ z)$).
+\end{itemize}
+\end{definition}
+
+\subsubsection{Bitcoin admits a billable-work scheme}
+
+A billable-work scheme for the bitcoin puzzle consists of:
+
+\begin{algorithmic}[0]
+  \State
+  \State $⊥ ← gen(d,d₀,m$)\Comment{no setup necessary}
+  \State
+  \Function{attempt\_server}{$puz, ⊥$}
+    \State nonce $\samples \{0,1\}^k$
+    \State bill ← nonce ∥ $m$
+    \State \Return (bill, bill)
+  \EndFunction
+  \State
+  \Function{check\_bill}{$puz, ⊥$, bill}
+    \State nonce$ ∥  m' ← $bill
+    \State \Return {($\hash(puz || $bill$) < 2^{-d₀}) ∧ (m' = m) $}
+  \EndFunction
+\end{algorithmic}
+
+
+\subsubsection{A Variation of Bitcoin is Stealable}
+
+Since we want to discourage outsourcing, we want to design a puzzle that does not admit such a protocol.
+
+\begin{definition}A stealable puzzle is one for for which no {\em billable-work} scheme exists.
+\end{definition}
+
+We assume the existence of a signature scheme $gen,sign_{pk},verify_{pk}$, where the signing operation is a deterministic oracle.
+
+\begin{algorithmic}[0]
+  \Function{attempt}{$puz,m$}
+    \State $sk,pk ← gen(1^k)$
+    \State nonce $\samples \{0,1\}^k$
+    \State $s₁ ← sign_{sk}(puz ∥ \tn{nonce})$
+    \State $s₂ ← sign_{sk}(puz ∥ \tn{nonce} ∥ m)$
+    \State \Return $(pk, \tn{nonce}, m, s₁, s₂)$
+  \EndFunction
+  \State
+  \Function{verify}{$puz, π$}
+    \State $(pk, \tn{nonce}, m, s₁, s₂)$
+    \State assert $verify_{pk}(s₁, puz ∥ \tn{nonce})$
+    \State assert $verify_{pk}(s₂, puz ∥ \tn{nonce} ∥ m)$
+    \State \Return {$(\hash(puz || s₁) < 2^{-d})$}
+  \EndFunction
+\end{algorithmic}
+
+\begin{theorem}
+The scratch-off puzzle above is {\em stealable}.
+\end{theorem}
+\proof
+(Informal) Suppose a billable work scheme exists. Then $\unn{Attempt\_Server}$ has a probability $p$ of producing a valid solution $π$, and therefore must make a minimum number of oracle queries indicated by $ε^{-1}_{d,k,n}(p)$. From these queries we can extract the secret key $sk$, and thus derive a solution $π'$ for arbitrary message $m'$.  \qed
+
+\subsubsection{A Stealable Storage Puzzle}
+
+\anote{our main construction goes here}
+
+
+\subsection{Non-Outsourceable Puzzles}
+
+A {\em watermarked billable-work} protocol for a puzzle captures a broader notion of enforceable contract. Even if the server is able to steal the reward, it may be discouraged from doing so for other reasons. In particular, if the server's work can be watermarked, such that any attempt to steal the reward would be a detectable breach of contract, then the client may be be able to rely on legal recourse.
 
 Since we want to discourage outsourcing, we want to design a puzzle that does not admit such a protocol. Below we give a more formal definition of the puzzle and watermarked billable-work protocol.
 
-Let $Bin(n,k,p) = \sum^k_{i=0}{n \choose i}p^i(1-p)^{n-i}$ be the probability of having $k$ or fewer successes out of $n$ independent trials, each with probability $p$ (i.e., the CDF of the Binomial distribution). Also let $Bin^{-1}(k,p,z) = \displaystyle{\argmin_k}\left[Bin(n,k,p) ≤ 1-z \right]$ be the smallest number of trials needed to produce $k$ successes with at least probability $z$ (i.e., the inverse CDF of the Binomial distribution).
+Let $Bin(n,k,p) = \sum^k_{i=0}{n \choose i}p^i(1-p)^{n-i}$ be the probability of having $k$ or fewer successes out of $n$ independent trials, each with probability $p$ (i.e., the CDF of the Binomial distribution). Also let $Bin^{-1}(k,p,z) = \argmin{n}\left[Bin(n,k,p) ≤ 1-z \right]$ be the smallest number of trials needed to produce $k$ successes with at least probability $z$ (i.e., the inverse CDF of the Binomial distribution).
 
-\begin{definition}A puzzle scheme consists of two functions:
-\end{definition}
-\begin{itemize}
-\item solution $← \unn{attempt}($puzid)
-\item  $\unn{verify}$(puzid, solution) ∈ \{0,1\}
-\end{itemize}
-
-satisfying the requirements for a proof-of-work lottery, informally that
-\begin{itemize}
-\item each $\unn{attempt}()$ takes $t$ steps and has at least a $2^{-d}$ chance of success.
-\item any arbitrary program $\adv_{\unn{attempt}}()$ taking at most $qt$ steps outputs a solution with probability at most $Bin(q,1,2^{-d}) = 1-(1-2^{-d})^q$.
-\end{itemize}
 
 
 \begin{definition}A watermark-billable-work scheme for a puzzle consists of four functions,
@@ -95,30 +262,16 @@ satisfying the requirements for a proof-of-work lottery, informally that
 \end{itemize}
 satisfying the following requirements:
 \begin{itemize}
-\item {\em (non-interference)} if an arbitrary adversary $\adv_{\unn{attempt}}($puzid) (without $sk$) runs in $t$ steps, then it produces a valid solution bearing the watermark with probability strictly less than $(1-ε)2^{-d}$, where $ε>0$ is a constant.
+\item {\em (non-interference)} if an arbitrary adversary $\Adv_{\unn{attempt}}($puzid) (without $sk$) runs in $t$ steps, then it produces a valid solution bearing the watermark with probability strictly less than $(1-ε)2^{-d}$, where $ε>0$ is a constant.
 \item {\em (feasible)} $\unn{attempt\_server}()$ takes $t$ steps and has at least a $2^{-d₀}$ chance of outputting a valid bill, and at least a $2^{-d}$ chance of outputting a valid puzzle solution.
-\item {\em (detectable)} if an arbitrary adversary $\adv_{\unn{attempt\_server}}()$ takes $qt$ steps and outputs a bill with probability $z$, then the probability of it outputting a valid puzzle solution that {\em evades} detection  (without the watermark) is at most $negl(λ)$ more than $Bin(q-t×Bin^{-1}(k,2^{-d₀},z), 1, 2^{-d})$.
+\item {\em (detectable)} if an arbitrary adversary $\Adv_{\unn{attempt\_server}}()$ takes $qt$ steps and outputs a bill with probability $z$, then the probability of it outputting a valid puzzle solution that {\em evades} detection  (without the watermark) is at most $negl(λ)$ more than $Bin(q-t×Bin^{-1}(k,2^{-d₀},z), 1, 2^{-d})$.
 \end{itemize}
 
 \begin{definition}
 A non-outsourceable puzzle is a puzzle for which no effective watermark-billable-work scheme exists.
 \end{definition}
 
-\subsection{Bitcoin is a watermarkable puzzle}
-
-\begin{algorithmic}[0]
-  \Function{attempt}{$puzid$}
-    \State nonce ← sample random
-    \State data ← listen for valid transactions
-    \State solution ← nonce ∥ data
-    \State \Return solution
-  \EndFunction
-  \State
-
-  \Function{verify}{puzid, solution}
-    \State \Return {$\hash($puzid$ || $solution$) < 2^{-d}$}
-  \EndFunction
-\end{algorithmic}
+\subsubsection{Bitcoin is a watermarkable puzzle}
 
 A watermark scheme for the bitcoin puzzle consists of:
 
@@ -143,7 +296,7 @@ A watermark scheme for the bitcoin puzzle consists of:
   \EndFunction
 \end{algorithmic}
 
-\subsection{A Zero Knowledge variation of the Bitcoin puzzle is not watermarkable}
+\subsubsection{A Zero Knowledge variation of the Bitcoin puzzle is not watermarkable}
 
 Assume we have a NIZK scheme for arbitrary circuits that is computationally sound and statistically zero-knowledge (in security parameter λ).
 
@@ -171,22 +324,22 @@ Assume we have a NIZK scheme for arbitrary circuits that is computationally soun
 The above scheme is non-outsourceable.
 \end{theorem}
 \IEEEproof 
-Suppose the existence of functions $\unn{attempt\_server}$, $\unn{check\_bill}$, and $\unn{detect}$ satisfy the {\em feasible}, {\em detectable}, and {\em non-interference} properties of a watermark-billable-work scheme. We will show a contradiction by constructing a witness distinguisher for the NIZK scheme. First we note that $\unn{attempt}($puzid$)$ runs in $t$ steps, and therefore by {\em non-interference} produces a detectable solution with probability less than $(1-ε)2^{-d}$. Next we apply the extractability of the NIZK scheme to $\adv_{\unn{attempt\_server}}$ and construct an alternate $\adv'$, which we then show is distinguishable from $\adv_{\unn{attempt}}$ yet differs only in its (hidden) witness.
+Suppose the existence of functions $\unn{attempt\_server}$, $\unn{check\_bill}$, and $\unn{detect}$ satisfy the {\em feasible}, {\em detectable}, and {\em non-interference} properties of a watermark-billable-work scheme. We will show a contradiction by constructing a witness distinguisher for the NIZK scheme. First we note that $\unn{attempt}($puzid$)$ runs in $t$ steps, and therefore by {\em non-interference} produces a detectable solution with probability less than $(1-ε)2^{-d}$. Next we apply the extractability of the NIZK scheme to $\Adv_{\unn{attempt\_server}}$ and construct an alternate $\Adv'$, which we then show is distinguishable from $\Adv_{\unn{attempt}}$ yet differs only in its (hidden) witness.
 \begin{algorithmic}[0]
   \State
-  \Function{$\adv'$}{puzid, $sk$}
-     \State (bill, $(π', m')) ← \adv_{\unn{attempt\_server}}($puzid, $sk$)
-     \State (nonce, $m) ← \mathcal{E}_{\adv_{\unn{attempt\_server}}}$($π'$, (puzid, $sk$))
+  \Function{$\Adv'$}{puzid, $sk$}
+     \State (bill, $(π', m')) ← \Adv_{\unn{attempt\_server}}($puzid, $sk$)
+     \State (nonce, $m) ← \mathcal{E}_{\Adv_{\unn{attempt\_server}}}$($π'$, (puzid, $sk$))
      \State π ← prove \Call{C}{(puzid, $m$), (nonce, $m⊕m'$)}
      \State \Return (bill, $(π, m))$
   \EndFunction
 \end{algorithmic}
- \anote{Assume that extraction preserves exactly the number $t$ of steps (not just polynomially related).}  $\adv'$ also takes $t$ steps, and outputs a bill (and/or a solution) whenever $\adv_{\unn{attempt\_server}}($puzid, $sk)$ does. Because $\adv'$ is {\em feasible}, it outputs a solution with probability $2^{-d}$; since it is {\em detectable}, it outputs a watermarked solution with similar probability. Therefore $\unn{detect\_watermark}$ can be used to distinguish between $\unn{attempt}$ and $\adv'$ with advantage $ε$. But $\adv'$ differs from only $\adv_{\unn{attempt}}$ in the choice of witness, so the distinguisher violates the statistical zero-knowledge property of the NIZK.
+ \anote{Assume that extraction preserves exactly the number $t$ of steps (not just polynomially related).}  $\Adv'$ also takes $t$ steps, and outputs a bill (and/or a solution) whenever $\Adv_{\unn{attempt\_server}}($puzid, $sk)$ does. Because $\Adv'$ is {\em feasible}, it outputs a solution with probability $2^{-d}$; since it is {\em detectable}, it outputs a watermarked solution with similar probability. Therefore $\unn{detect\_watermark}$ can be used to distinguish between $\unn{attempt}$ and $\Adv'$ with advantage $ε$. But $\Adv'$ differs from only $\Adv_{\unn{attempt}}$ in the choice of witness, so the distinguisher violates the statistical zero-knowledge property of the NIZK.
 \qed
 
+\subsubsection{A Non-Outsourceable Storage Puzzle}
 
-
-
+\anote{The pinocchio-based zero-knowledge puzzle construction goes here}
 
 \bibliographystyle{IEEEtran}
 \bibliography{dispersion}
