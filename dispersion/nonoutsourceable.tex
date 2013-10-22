@@ -1,8 +1,10 @@
 %\documentclass[conference]{IEEEtran}
 %\documentclass[onecolumn]{article}
-\documentclass{article}
+\documentclass[]{article}
 \newcommand{\IEEEproof}{\proof}
 
+
+\newcommand{\elaine}[1]{{\footnotesize\bf\color{blue} [elaine: #1]}}
 \newcommand{\anote}[1]{{\color{magenta}[AM: #1]}}
 \usepackage{amsmath,amsthm,amscd,amssymb}
 \usepackage{verbatimbox}
@@ -21,13 +23,13 @@
 \newtheorem{lemma}{Lemma}
 \newtheorem{theorem}{Theorem}
 
-\theoremstyle{definition}
+\setlength{\parskip}{1pt}
+
+%\theoremstyle{definition}
 \newtheorem{definition}{Definition}
 
 \theoremstyle{remark}
 \newtheorem{remark}{Remark}
-
-\usepackage{mathpartir}
 \usepackage{color}
 \usepackage{xspace}
 
@@ -41,6 +43,33 @@
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
 
+\usepackage{protocolj}
+\newcommand{\pprotocol}[5]{
+{\begin{figure*}[#4]
+\begin{center}
+\setlength{\protowidth}{.9\textwidth}
+%\addtolength{\protowidth}{-3\intextsep}
+
+\fbox{
+        \small
+        \hbox{\quad
+        \begin{minipage}{\protowidth}
+    \begin{center}
+    {\bf #1}
+    \end{center}
+        #5
+        \end{minipage}
+        \quad}
+        }
+        \caption{\label{#3} #2}
+\end{center}
+\vspace{-4ex}
+\end{figure*}
+} }
+
+\algrenewcommand\textproc[1]{\textsf{#1}}
+\algrenewcommand\algorithmicfunction{{}}
+
 %\lstloadlanguages{Matlab} %use listings with Matlab for Pseudocode
 %\lstnewenvironment{PseudoCode}[1][]
 %{\lstset{language=Matlab,basicstyle=\scriptsize, keywordstyle=\color{blue},numbers=left,xleftmargin=.04\textwidth,#1}}{}
@@ -50,9 +79,12 @@
 \newcommand{\argmin}[1]{\displaystyle{\ArgMin_{#1}}}
 \newcommand{\hash}{\mathcal{H}}
 \newcommand{\Adv}{\mathcal{A}}
+\newcommand{\Chal}{\mathcal{C}}
 \newcommand{\tn}{\textnormal}
-\newcommand{\unn}[1]{\uppercase\tn{#1}}
+\newcommand{\unn}[1]{\textnormal{\textsf{#1}}}
 \newcommand{\samples}{\overset{\$}{←}}
+\newcommand{\puz}{\textnormal{\textsf{puz}}}
+\newcommand{\bill}{\textnormal{\textsf{bill}}}
 \begin{document}
 
 \title{Decentralized Storage from Scratch}
@@ -60,79 +92,164 @@
 \maketitle
 
 \begin{abstract}
-  Bitcoin is widely regarded as the first broadly successful e-cash system. The main determinant of its success has been its attractive structure of incentives for participation that supposedly encourages ``decentralization,'' which roughly means that influence over the network (i.e., ``mining power'') tends to be dispersed among a large number of uncorrelated entities. However, to date, no model has been proposed in which ``decentralization'' can be clearly defined, which has made it difficult to evaluate whether Bitcoin's particular construction (or variations thereof) meets this goal.
+  Bitcoin is widely regarded as the first broadly successful e-cash system. The main determinant of its success has been its attractive incentive structure that apparently encourages participation from diverse and independent entities. We provide the first formalization of this incentive structure (which we call a Scratch-off Lottery) along with a simple rational model under which we can evaluate whether such schemes lead to decentralized participation as desired.
 
-We first introduce a simple economic game involving two types of rational (under Cumulative Prospect Theory) agents - clients and servers - that captures an intuitive notion of ``decentralization''. We derive Bitcoin's lottery-like incentive structure as a viable solution in this model. Surprisingly, we find that Bitcoin is decentralized only when participation is {\em unprofitable} on average.
+An oft-cited concern is that Bitcoin's underlying mechanism (which we call a Scratch-off Puzzle), involves continuously attempting to solve computational puzzles, may be unnecessarily wasteful; the puzzle solutions are not intrinsically useful, nor is specialized puzzle-solving hardware useful for anything else. We propose an alternative Scratch-off Puzzle based on Proofs-of-Retrievability, such that solving the puzzle requires random access to a copy of a file. Participation in a Scratch-off Lottery based on this puzzle has the beneficial side effect of highly decentralized file storage, thereby reducing the system's overall waste. We use our rational model to show that the modified puzzle preserves the essential properties of the original Bitcoin puzzle. We also provide an implementation and experiments to demonstrate the practicality of this modification.
 
-Second, we find that Bitcoin's particular puzzle construction defeats the intended incentive structure; we demonstrate that the puzzle is amenable to ``outsourcing'', by which clients and servers enter into enforceable and mutually beneficial contracts, which leads to centralization. We construct a puzzle for which such contracts would inherently be unenforceable, under computational assumptions about the overhead of secure outsourcing.
+Finally, we suggest a more realistic rational model that accounts for outsourcing and economies-of-scale (i.e., cloud computing), in which the original scheme leads to an undesirable centralized (rather than decentralized) outcome. We show how to repair the puzzle and lottery scheme (including our storage side-effect) to achieve decentralized participation even in this model.
 
-Finally, we show that the benefits of decentralization extend beyond dispersing compute power amongst the participants; indeed, we show that incentivizing decentralization makes BitCoin a natural resource for reliable peer-to-peer storage. Our approach is to ``graft'' a Proof-of-Retrievability scheme into the puzzle, such that finding a solution requires access to a complete file copy. This also addresses an oft-cited drawback of Bitcoin, namely that the mining operation is wasteful. The ``goldrush'' towards competitive participation has led to manufacturing investment in specialized ``mining equipment,'' which is otherwise essentially useless. Our proposed modification {\em recycles} this investment, thereby reducing the system's overall waste.
 \end{abstract}
 
-\section{Scratch-Off Puzzles}
+\section{Introduction}
+
+\input{intro}
+\input{related}
+\input{requirement}
+\input{scheme}
+
+\subsection{Overview of Bitcoin}
+
+
+
+
+\section{Proof of Storage Locality}
+
+We initially define a proof of locality as a protocol between a verifier and a prover.
+
+A proof of retrievability guarantees that a file can be extracted from the a successful prover. A RAFT is a proof of redundancy, relies on properties of a typical disk to guarantee that not only can the file be extracted, but that it is stored on sufficiently many redundant disks. A proof of storage locality is intended to guarantee that the file is stored on a file near the user, and not on a cloud server somewhere.
+
+To begin with we review the standard definition of a proof of retrievability.
+
+\begin{figure*}[h]
+\centering
+\fbox{
+\begin{protocol}{2}
+%\protocolheader{\underline{Pre-processing phase}}
+\participants{\underline{Verifier}}{\underline{Prover}}
+\tn{File}~ F = F₁,...,F_{n} & \sends{F} & \tn{Stores $F$ on local disk} \\
+c \samples \{0,1\}^k, b \samples 1,...,n &  \sends{c,b} & \\
+\tn{verify}(pk, π, c ∥ F_b)  & \receives{π} & π ← \tn{sign}(sk, c ∥ F_b) \\
+
+\end{protocol}
+}
+\caption{Proof of Storage Locality Protocol}
+\end{figure*}
+
+\subsection{Adversarial Model}
+
+As in RAFT, we model a restricted form of adversary where we constrain what choices the adversary can make. In particular, the adversary chooses what data to store on the local disk, $D$. We assume that $|D| = |F|$, meaning the local disk is large enough to store the entire file. We assume that the disk is static therefore $D$ suffices for the entire experiment. The prover's local computation is modeled by an interactive Turing machine $M_P$ that has bounded space; therefore the prover cannot store much of the file in its machine memory rather than the disk. Finally the cloud server is modeled by an interactive Turing machine $M_S$. Crucially, we assume there is a minimum latency $Δ_{min}$ between the prover and the cloud machines.
+
+We assume the existence of a signature oracle, such that either $M_S$ calls the random oracle, or $M_P$ does, but there is no effective way for them to do so together (e.g., in a secure computation).
+
+\section{Muli-User Protocol}
+
+
+
+
+\section{Emergency Global Back-Up Storage Game}
+
+Scenario: the Government shuts down, and the Library of Congress digital archives are unavailable! \anote{better explanation here? geographical disaster?}
+
+\begin{enumerate}
+\item (Setup Phase) Begin with a file to backup $F$ (an image of the LoC digital archives). A trusted dealer \anote{not right word} can encode the file as necessary and publish a digest.
+\item (Operational Phase) A population of $n$ rational parties in the network play at a lottery participation game, which we will describe later. In the participation game each party decides how much of their budget to allocate towards participation (i.e., purchasing a hard drive) and chooses a computational strategy. Depending on the outcome of the lottery, a participant may receive a monetary reward. Potentially many such phases are completed.  \anote{may not be necessary at this point to have joining/leaving}.
+  \begin{itemize}
+  \item Participants are able to interact with a semi-trusted mirror in order to download portions of the file as necessary (the mirrors are trusted for availability but may send incorrect files)
+  \item Several untrusted ``cloud temptation'' service providers that offer to help the user participate (e.g., by storing files on their behalf), and pass the rewards (minus their costs, which are discounted) to the participant
+  \item No collusion or side-channel conversations between participants
+  \item \anote{Assumptions necessary for monetary reward and puzzle master?}
+  \end{itemize}
+\item (Recovery Phase) At some point the game ends, and the semi-trusted mirrors (and any service providers) are removed. A challenger must be able to reconstruct the original file through interaction with the participants, who for the sake of this phase are assumed to be honest.
+\end{enumerate}
+
+High level description of our approach to the solution:
+\begin{itemize}
+\item Scratch-off puzzle lottery, that rewards participants for storing a subset of the file
+\item Outsource prevention: latency, cost of bandwidth prevent user from scart
+\end{itemize}
+
+
+\section{Scratch-off Puzzles}
 
 Scratch-off puzzles are moderately hard computational puzzles, used for constructing scratch-off lotteries. They are similar to proof-of-work puzzles and client puzzles, but differ in two ways: first, the puzzle should admit concurrent work, such that even a small amount of computation leads to a proportional chance of success; second, solving a scratch-off puzzle entitles the solver to associate a message with the solution. Associating a message with a solution allows the solver to claim or spend a reward. Our definition is adapted from the client-puzzles in \cite{chen2009security,stebila2011stronger}.
 
-Let $ε_{d,k,n} : ℕ → \left[0,1\right]$ and $ω_{d,k} : ℕ → \left[0,1\right]$ be a family of functions, which will bound from below (resp., from above) the probability of puzzle-solving success from concurrent attempts by honest parties (resp., attempts by the adversary), where $d$ is a difficulty parameter, $k$ is a security parameter, and $n$ is a number of distinct puzzles.
-
-\begin{definition}A scratch-off puzzle consists of two functions:
+\begin{definition} {\bf (Scratch-off Puzzle)} An scratch-off puzzle (parameterized by security parameter $k$) consists of spaces $\{pSpace$, $sSpace$, $dSpace ⊆ ℝ₊$, $mSpace$\}, and three functions $\{\unn{Gen},\unn{Scratch},\unn{Verify}\}$ with the following descriptions:
 \begin{itemize}
-\item $π ← \unn{scratch}(puz, m)$
-\item  $\unn{verify}(puz, π, m) ∈ \{0,1\}$
-\end{itemize}
+\item $\puz ← \unn{Gen}(d)$ takes as input a difficulty parameter ($d ∈ dSpace$), and generates a puzzle instance $\puz ∈ pSpace$
+\item $π ← \unn{Scratch}(\puz, m)$ runs in $t₁$ steps, makes a single attempt at finding a puzzle solution $π ∈ sSpace ∪ \{⊥\}$ associated with $m ∈ mSpace$, returning $⊥$ if no solution is found
+\item  $\{0,1\} ← \unn{Verify}(\puz, π, m)$ checks if π is a valid solution associated with $m$.
+\end{itemize}.
 
-satisfying the following properties:
-\begin{itemize}
-\item {\em (ω-Concurrent)} $\unn{scratch}(\cdot)$ is a probabilistic algorithm that takes at most $t₀$ steps. For any number $n$, and sequence of messages $\{m₁,m₂,...,m_n\}$, then the output of $n$ concurrent attempts, $π_i ← \unn{scratch}(puz,m_i)$ for $1 ≤ i ≤ n$, contains a winning solution (i.e., there exists an $\hat{i}$ such that $\unn{verify}(puz,π_{\hat i},m_{\hat i})$) with at least probability $ω_{d,k}(n)$.
+Additionally, the puzzle must satisfy two requirements, {\em feasibility} and {\em difficulty}, which respectively relate an upper bound on the effectiveness of an adversary (solving multiple concurrent puzzles with oracle access to other solving parties) and a lower bound on the effectiveness of concurrent and independent clients following the prescribed algorithm to the function $ζ(n,t,d) : ℕ × ℕ × dSpace → \left[0,1\right]$ which corresponds to the probability of drawing $n$ successes out of $t$ identical independent Bernoulli trials, each with probability $2^{-d}$.
 
-\item {\em (ε-Strong)} Let $\{(puz₁,m₁),...,(puz_q,m_q)\}$ be an arbitrary sequence of messages and puzzles. Let $\Adv$ be an arbitrary adversary with unbounded oracle access to $\unn{scratch}(puz_i, m_i), 1 ≤ i ≤ q$, and at most $t$ additional steps. Then $\Adv$ computes $n$ solutions to distinct puzzles, $\{puz'₁,...,puz'_n\}$, with designated messages $\{m'₁,...,m'_m\}$, such that $∀(i,j)$, $(puz_i,m_i)≠(puz'_j,m'_j)$, with probability at most $ε_{d,k,n}(t)$.
+Assume that $t_k ∈ O(poly(k))$ is a fixed bound on the running time of any adversary.
 
-\end{itemize}
+\noindent {\sc Feasibility game (\unn{Feas})}. The feasibility game $\unn{Feas}^{\unn{SPuz}}_{\Adv,d}(t)$ for an adversary $\Adv$ and a challenger $\Chal$ consists of the following four stages:
+\begin{enumerate}
+\item challenger $\Chal$ generates a puzzle, $\puz ← \unn{Gen}(d)$
+\item adversary $\Adv$ chooses $t$ messages $m₁,m₂,...,m_t$
+\item challenger $\Chal$ executes $π_i ← \unn{Scratch}(\puz,m_i)$ for $1 ≤ i ≤ t$.
+\item the outcome of the game is $\displaystyle \bigvee_{1≤i≤t} \unn{Verify}(\puz, π_i, m_i)$.
+\end{enumerate}
+
+The feasibility requirement (for $t ≤ t_k$) is that
+\begin{equation*}
+  \Pr\left[ \unn{Feas}^{\unn{SPuz}}_{\Adv,d}(t) = 1 \right] ≥ ζ(1,t,d) - ν(d,k)
+\end{equation*}
+for some fixed negligible function ν.
+
+\noindent {\sc Non-Malleable Difficulty game (\unn{Diff})}. The non-malleable difficulty game $\unn{Diff}^{\unn{SPuz}}_{\Adv,d,n}(t)$ between an adversary $\Adv$ and challenger $\Chal$ consists of the following stages:
+\begin{enumerate}
+\item adversary $\Adv$ runs for $t$ steps and outputs a sequence of $n$ puzzles, messages and potential solutions, $\{(\puz_1, π_1, m_1),...,(\puz_n, π_n,m_n)\}$.
+\item the outcome of the game is 1 iff all solutions returned by the adversary are valid and the puzzle/message pairs are unique, i.e., \begin{equation*} \displaystyle \bigwedge_{1≤i≤n} \left( \unn{Verify}(\puz_i, π_i, m_i) ∧ \left( \bigwedge_{1≤j≤q} (\puz_i,m_i) ≠ (\puz_j,m_j) \right) \right).\end{equation*}
+\end{enumerate}
+
+ \begin{equation*}
+\Pr\left[ \unn{Diff}^{\unn{SPuz}}_{\Adv,d}(n,t) = 1 \right] ≤ ζ(n,t,d) + ν(d,k)
+ \end{equation*}
+
 \end{definition}
 
-\begin{remark}
-The ε-strong condition resembles non-malleability in digital signatures. It captures the property that the adversary cannot reuse the output of honest participants in order to more easily find a solution for a message of its choice.
-\end{remark}
+Unlike \cite{chen2009security,stebila2011stronger,groza2013cryptographic}, we do not require that a puzzle solution can be found in with probability $1$ in bounded time, or even that a solution necessarily exists for every instance.
 
-\begin{definition}A strong scratch-off puzzle satisfies the following condition on $ε$:
-\begin{itemize}
-  \item $|ε_{d,k,n}(t) - ε_{d,k,1}(t/n)| ≤ negl(k,d)$
-\end{itemize}
-\end{definition}
-
-\begin{remark}
-This captures the property that solving several puzzles is not easier or amortizable compared to solving a single puzzle.
-\end{remark}
-
-\begin{definition}A concurrent scratch-off puzzle satisfies the following condition on $ω$:
-\begin{itemize}
-  \item $|ω_{d,k}(n) - (1-(1-ω_{d,k}(1))^n)| ≤ negl(k,d)$
-\end{itemize}
-\end{definition}
-
-\begin{remark}
 This captures the property that $n$ independent concurrent scratch-off attempts each contribute an approximately equal chance of winning. The negligible difference accounts for the possibility that concurrent attempts may draw the same random coins twice.
-\end{remark}
+
+Like \cite{stebila2011stronger}, our difficulty requirement is that puzzles are not amortizable, i.e., solving $n$ puzzles requires no fewer steps in expectation than $n$ times the expected number of steps to solve a single puzzle.
 
 \subsection{Bitcoin is a scratch-off puzzle}
 
-The Bitcoin puzzle scheme is as follows:
-\begin{algorithmic}[0]
-  \Function{attempt}{$puz,m$}
-    \State nonce $\samples \{0,1\}^k$
-    \State π ← nonce ∥ $m$
-    \State \Return π
-  \EndFunction
-  \State
-  \Function{verify}{$puz, π$}
-    \State \Return {$\hash(puz || π) < 2^{-d}$}
+Let $\hash : \{0,1\}^* → \{0,1\}^k$ be a random oracle, and let $dSpace = \{0,1,2,...,2^k\}$, $sSpace = pSpace = \{0,1\}^k$, and let steps be counted as a number of oracle queries.
+
+\begin{itemize}
+\item \begin{algorithmic}[0]
+  \Function{Gen}{$d,1^k$}:
+     \Return $\puz \samples \{0,1\}^k$
   \EndFunction
 \end{algorithmic}
+\item \begin{algorithmic}[0]
+  \Function{Scratch}{$\puz,m$}:
+    \State π $\samples \{0,1\}^k$
+    \If {$\hash(\puz ∥ d ∥ π ∥ m) < 2^{-d}$}
+       \Return $π$
+    \Else  ~\Return $⊥$
+    \EndIf
+  \EndFunction
+  \end{algorithmic}
+\item
+ \begin{algorithmic}[0]
+  \Function{Verify}{$\puz, π, m$}:
+    \State \Return {$\hash(\puz ∥ d ∥ π ∥ m) < 2^{-d}$}
+  \EndFunction
+\end{algorithmic}
+\end{itemize}
 
-\anote{todo: give the specific function families $ε$ and $ω$ that it satisfies}
+\begin{proposition}
+Bitcoin is a scratch-off puzzle.
+\end{proposition}
+\proof The probability of any two invocations of $\unn{Scratch}$ sampling the same coins is vanishing in $k$. This is sufficient to satisfy the feasibility requirement. Similarly, the probability of the adversary guessing a correct solution without checking is vanishing in $d$, and the probability of the challenger generating two identical puzzles is vanishing in $k$. This is sufficient to satisfy the difficulty requirement.
+ \qed
 
-
-\section{Storage Puzzles}
+\subsection{Storage Puzzles}
 
 A storage puzzle is a variation of a scratch-off puzzle with an embedded proof-of-retrievability. Each scratch-off attempt requires accessing random blocks of an encoded file. If an adversary attempts to solve the puzzle while only storing a corrupt or incomplete file, it will have to abort many of its scratch-off attempts, lowering its overall effectiveness. We formalize this by relating the probability of extraction (i.e., successfully recovering the entire file from oracle transcripts) to the probability of computing a puzzle solution in $t$ steps.
 
@@ -142,8 +259,6 @@ A storage puzzle is a variation of a scratch-off puzzle with an embedded proof-o
 \end{itemize}
 \end{definition}
 \anote{Need to clarify the shape of $γ$.}
-
-\subsubsection{A Storage Puzzle}
 
 The following is a storage puzzle:
 
@@ -163,19 +278,18 @@ The following is a storage puzzle:
 \anote{I need to do the calculation for this, as a function of $\Adv$'s number of steps, the number of iterations and error correction parameters.}
 
 
-\section{Preventing Outsourced Puzzle Solving}
-
+\subsection{Non-Outsourceable Puzzles}
 We'd like for clients to solve puzzles themselves, rather than paying servers do it for them. Our approach is to make it difficult to delegate the puzzle securely.
 
-\subsection{Stealable Puzzles}
+\subsubsection{Billable Work}
 
 A {\em billable-work} protocol for a scratch-off puzzle captures the notion of an enforceable contract between a server and a client that would enable them to make a mutually beneficial arrangement. A client is willing to pay a low-variance price in exchange for puzzle-solving work, where such work leads to a high-variance payoff distribution. The server prefers low-variance payoff overall; regardless of the outcome of the work (whether a  solution was found), the server would like to send the client a bill based on computational resources consumed. A billable work scheme is secure if the server can not present bills to the client while reusing the work for its own purposes.
 
-\begin{definition}A billable-work scheme for a puzzle consists of four functions,
+\begin{definition}A billable-work scheme for a scratch-off puzzle $\unn{SPuz}$ consists of four functions,
 \begin{itemize}
-\item $sk,pk ← gen(d,d₀,m)$
-\item (bill, π) ← $\unn{attempt\_server}(puz, sk)$
-\item $\unn{check\_bill}(puz, pk, $bill$) ∈ \{0,1\}$
+\item $sk,pk ← \unn{Gen}_\unn{SPuz}(d,d₀,m)$
+\item $(\bill, π) ← \unn{ScratchServer}(\puz, sk)$
+\item $\unn{CheckBill}(\puz, pk, \bill) ∈ \{0,1\}$
 \end{itemize}
 satisfying the following requirements:
 \begin{itemize}
@@ -205,9 +319,24 @@ A billable-work scheme for the bitcoin puzzle consists of:
 \end{algorithmic}
 
 
-\subsubsection{A Variation of Bitcoin is Stealable}
+\subsubsection{A Variation of Bitcoin is Non-Outsourceable}
 
 Since we want to discourage outsourcing, we want to design a puzzle that does not admit such a protocol.
+
+\begin{definition}{\bf (Malleable Scratch-off Puzzle)} 
+\noindent {\sc Malleable Difficulty game (\unn{DiffM})}. The malleable difficulty game $\unn{DiffM}^{\unn{SPuz}}_{\Adv,d,n}(t)$ between an adversary $\Adv$ and challenger $\Chal$ consists of the following stages:
+\begin{enumerate}
+\item challenger $\Chal$ generates $n$ puzzles, $\puz_n ← \unn{Gen}(d,1^k)$
+\item adversary $\Adv$ makes an unbounded number of oracle queries $\unn{OScratch}(\puz'_j,m'_j)$, for arbitrary choices of $\puz'_j,m'_j$. $\Adv$ may also take $t$ additional steps, arbitrarily interleaved with the oracle queries. $\unn{OScratch}$ records the transcript sequence $\{(\puz'_1,m'_1),...,(\puz'_q,m'_q)\}$.
+\item adversary $\Adv$ returns a sequence of $n$ messages and potential solutions, $\{(m_1,π_1),...,(π_n,m_n)\}$.
+\item the outcome of the game is 1 iff all solutions returned by the adversary are valid and the associated solutions are disjoint with those attempted by the oracle queries, i.e., \begin{equation*} \displaystyle \bigwedge_{1≤i≤n} \left( \unn{Verify}(\puz_i, π_i, m_i) ∧ \left( \bigwedge_{1≤j≤q} (\puz_i,m_i) ≠ (\puz'_j,m'_j) \right) \right).\end{equation*}
+\end{enumerate}
+
+The difficulty requirement (for $t ≤ t_k$) is that
+ \begin{equation*}
+\Pr\left[ \unn{DiffM}^{\unn{SPuz}}_{\Adv,d}(n,t) = 1 \right] ≤ ζ(n,t,d) + ν(d,k)
+ \end{equation*}
+\end{definition}
 
 \begin{definition}A stealable puzzle is one for for which no {\em billable-work} scheme exists.
 \end{definition}
@@ -237,9 +366,104 @@ The scratch-off puzzle above is {\em stealable}.
 \proof
 (Informal) Suppose a billable work scheme exists. Then $\unn{Attempt\_Server}$ has a probability $p$ of producing a valid solution $π$, and therefore must make a minimum number of oracle queries indicated by $ε^{-1}_{d,k,n}(p)$. From these queries we can extract the secret key $sk$, and thus derive a solution $π'$ for arbitrary message $m'$.  \qed
 
-\subsubsection{A Stealable Storage Puzzle}
+\subsection{A Non-Outsourceable Storage Puzzle}
+
+The notion of a non-outsourceable puzzle can be combined with our notion of storage puzzle. The following is our main construction:
 
 \anote{our main construction goes here}
+
+
+\section{Scratch-off Lottery}
+An economic model exploring the incentive structures supported by scratch-off lotteries.
+
+Consider the following game involving $n$ rational participants. The game consists of two phases, a negotiation phase and an execution phase. In the negotiation phase, each player $P_i$ has an identical budget $b_{max}$, and must make a purchasing decision $0 ≤ b_i ≤ b_{max}$, which represents the amount of computational power $P_i$ controls in the execution phase. We will explain the execution phase before describing the negotiation phase in more detail. The execution phase consists of an unbounded number of rounds. The execution phase depends on fixed common-knowledge parameters $J$ (the maximum monetary reward), $E$ (the expected number of rounds in the execution phase), and $Δ$ (the maximum communication latency), as well as parameters that are chosen during the negotiation phase, $d$, and $0 ≤ Δ_i ≤ Δ$. Each round $r$ of the execution phase proceeds as follows:
+\begin{enumerate}
+\item A puzzle is generated with the indicated difficulty, $\puz ← \unn{Gen}(d)$.
+\item In every round, each player $P_i$ makes $b_i$ invocations of $\unn{Scratch}(\puz,m_i)$, where each player's message $m_i$ is their public identifier. The order in which the steps are taken is determined by an arbitrary adversarial scheduler, $\Adv$.
+\item If a player $P_i$ computes a valid solution, then an item $(i,r+Δ_i)$ is stored in a array.
+\item The execution phase ends when the array contains an item matching the current round number, $(i,r)$. If multiple items match the round number, then only the first one wins. The corresponding player $P_i$ receives the jackpot, thus $b_{max}-b_i+J$ in total. Every other player $P_j$ receives nothing, so $b_{max}-b_j$.
+\end{enumerate}
+
+The negotiation phase consists of an unbounded number of rounds, and proceeds as follows:
+\begin{enumerate}
+\item Every player's bid, $b_i$, is initially set to zero.
+\item In each round, the adversarial scheduler permutes the players arbitrarily. In order, each player $P_i$ is told the current total statistic, $b_{tot} = \displaystyle \sum_j b_j$. The player can leave her bid $b_i$ unchanged, or change it to any value between $0$ and $b_{max}$.
+\item The negotiation phase concludes if in a round all players leave their bids unchanged.
+\item If the negotiation phase concludes, then afterwards the adversary chooses each $Δ_i$, and sets $2^d = E\cdot b_{tot}$.
+\end{enumerate}
+
+We assume that the players are risk neutral, and therefore attempt to maximize their expected profit only. Although the delay parameters $Δ_i$ are unknown to the players during negotiation, we assume that their decision function may be modeled as though they have an arbitrary belief distribution assigning a probability density to every potential value for $Δ_i$. We also assume non-collusion between the players, such that they have no communication channels between them.
+
+Suppose we have a participation target, given as $\hat{n} ≤ n$, indicating that we would like for at least $\hat{n}$ players each to contribute at least $b_i ≥ 1$. We now argue a positive result, that for every participation target, and environment parameters $Δ$ and $b_{max}$, there exists a parameter choice for $E$ and $J$ that satisfies the participation target.
+
+\begin{proposition}
+Fix the environment parameters $n$, $Δ$ and $b_{max}$, as well as the participation target $\hat{n}≤n$. Then there exist parameters $E$ and $J$ such that every equilibrium (if any exist) reaches the participation target.
+\end{proposition}
+\proof We can choose $E>0$ arbitrarily and calculate a suitable $J$. Suppose during a round of negotiation that fewer than $\hat{n}$ participants have positive bids. Then $b_{tot} ≤ \hat{n}\cdot b_{max}$. Consider the decision made by a player $P_i$ whose current bid is zero. If she were to increment her bid, then the probability that she would win is at least bounded below by the joint probability that she finds a solution in the first round, and no one else finds a solution for $Δ$ rounds. The probability that everyone else loses for $Δ$ consecutive rounds is at least $p₁ = Bin\left(0,\hat{n}\cdot b_{max}, \left(E(\hat{n}\cdot b_{max}+1)\right)^{-1}\right)$. The probability that she wins in the first round is at least $p₂ = \left(E(\hat{n}\cdot b_{max}+1)\right)^{-1}$. By setting $J > (p₁p₂)^{-1}$, the expected return from a nonzero bid is positive, even given the pessimistic beliefs. Thus any configuration that does not satisfy the participation target is not an equilibrium. \qed
+
+\subsection{Security Analysis}
+
+Here we relate the scratch-off lottery, instantiated with our non-outsourceable storage puzzle, to our backup storage game, and argue that under the conditions listed, it is secure.
+
+\section{Implementation and Experiments}
+
+\section{Discussion}
+Ways of weakening the model so it's more realistic
+
+\section{Conclusion}
+
+
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{dispersion}
+
+
+\appendix
+
+
+\section{Other economic models}
+
+
+
+\subsection{More Realistic Economic Models}
+
+\subsubsection{Risk Neutral Model with 2 Types}
+
+The above model demonstrates establishes a notion of participation as a protocol goal, and the effectiveness of an incentive scheme at achieving this. However we relied on an assumption of homogeneous preferences. In order to describe a notion of decentralization, we need to further refine the model in order to express trends like the aggregation of computational resources due to greater efficiency in economies of scale.
+
+Consider a refinement of the model above, involving two types of players, servers and clients. We assume that servers have proportionally cheaper access to computational (by a constant factor $c < 1$) and unbounded budgets, and that servers have zero communication latency. The participation target is expressed as a desired number of clients. The payoff to a winning server is thus $-c\cdot b_i + \cdot J$.
+
+\begin{proposition}
+In the lottery game above, with two types of participants clients and servers, where servers have no latency and participation is discounted by factor $c < 1$, then there is no equilibrium in which any client participates.
+\end{proposition}
+\proof
+Suppose for contradiction such an equilibrium exists. Then consider a server presented with the option of incrementing its participation bid. Since the current value $b_i$ is assumed to equilibrium, the incremental cost of one unit of participation must be no smaller than the expected payoff. Now suppose a client with a positive amount $b_j > 0$ considers decrementing his bid. Even if the client is fully optimistic and believes $Δ_j = 0$, the payoff for a jackpot is no greater than that of a server, yet the cost of participation is strictly higher. Therefore the client prefers to decrement the bid.
+\qed
+
+\subsubsection{CPT Model with 2 Types}
+
+This is a model for rational behavior that accounts for why people play casino games and purchase lottery tickets.\cite{cpt}, \cite{cptaxiomatization}. Regressivity of lotteries, evidence from powerball \cite{powerball}. Empirical evidence for the shape of the weighting function ~\cite{gonzalez1999shape}.
+
+For simplicity, we consider only the most restricted form, expected utility plus one parameter, $0 < α < 1$, given by Prelec: ~\cite{prelec1998probability}
+\begin{equation}
+  w(p) = exp\left[(-ln(p))^α\right]
+\end{equation}
+
+This particular representation can be derived from additional axioms that refine CPT, specifically compound invariance, diagonal concavity, subproportionality.
+
+We assume that $α$ applies only to clients, and that for servers $α_{servers} = 1$, which means that the server's decision making is identical to the expected-profit-maximizing version from the previous model.
+
+\begin{proposition}
+For the scratch-off lottery game described above, where clients' decision making is parameterized by $0 < α < 1$ and servers maximized expected profits, if $c < f(α)$ then there exists a choice of parameters $E$ and $J$ such that any equilibrium achieves the participation target.
+\end{proposition}
+\proof 
+  The slope of $w(p)$ as $p$ approaches zero becomes steeper without bound. It is therefore possible to choose $J$ large enough that $w(p)>c^{-1}$. $E$ can be set arbitrarily large so that the effect of latency $Δ$ is negligible, and thus the expected cost of funding the lottery, $J/E$, is arbitrarily small.
+\qed
+
+There are, unfortunately, numerous concerns about this model. One is that the extreme behavior of the weighting function at very small probabilities seems implausible. Another is that this does not account for any diminishing utility of wealth. Although in Bitcoin, the protocol itself defines how money is printed and therefore the bankroll may be arbitrarily large, an unbounded jackpot size implies that a player might win *all* the money. The more general form of the function we've accounted for corrects for this by having a value function (mapping monetary profit to utility) that exhibits diminishing returns.
+
+
 
 
 \subsection{Non-Outsourceable Puzzles}
@@ -341,11 +565,7 @@ Suppose the existence of functions $\unn{attempt\_server}$, $\unn{check\_bill}$,
 
 \anote{The pinocchio-based zero-knowledge puzzle construction goes here}
 
-\bibliographystyle{IEEEtran}
-\bibliography{dispersion}
 
-
-\appendix
 
 \end{document}
 
@@ -420,55 +640,7 @@ reward and the epoch ends.
 %% \end{algorithm}
 
 
-\section{Economic Model}
 
-Our economic model is intended to provide a workable definition of ``decentralization,'' the defining characteristic of Bitcoin's design objectives. 
-
-Our high-level model involves a game played by a population of
-rational agents. Each participant decides how much money to invest and how to allocate it. 
-Monetary rewards are disbursed to agents to encourage (correct) participation.  
-The agents decide how to participate based on rational decision making (i.e., based on ordinal preference relations), and how to allocate computational resources.
-
-\subsection{Cumulative Prospect Theory, Rationality of Gambling}
-
-This is a model for rational behavior that accounts for why people play casino games and purchase lottery tickets.\cite{cpt}, \cite{cptaxiomatization}.
-
-Relationship with Expected Utility, traditional model of rationality.
-
-Three axioms 
-
-Regressivity of lotteries, evidence from powerball \cite{powerball}
-
-Empirical evidence for the shape of the weighting function ~\cite{gonzalez1999shape}.
-A typical weighting function is given by Prelec ~\cite{prelec1998probability}, $w(p) = w⁺(p) + w⁻(p)$, where
-
-\begin{equation}
-  w⁺(p) = exp[-β⁺(-ln(p))^α]
-\end{equation}
-and
-\begin{equation}
-  w⁻(p) = exp[-β⁻(-ln(p))^α].
-\end{equation}
-
-This particular form satisfies additional axioms that refine CPT, specifically compound invariance~\cite{prelec1998probability}.
-
-\subsection{Decentralization Lottery Game}
-
-We model participation in Bitcoin by a game involving two types of players, {\em clients} and {\em servers}. The game represents a fixed interval of time (e.g., one week), during which each player decides how much money to invest in Bitcoin mining.
-We assume that servers are risk-neutral and profit-maximizing (i.e., with a linear utility function and no probability distortion).
-Clients are assumed to have functions of the typical shape (i.e., S-shaped probability weighting function that overweights unlikely events and underweights near-certain events).
-
-However, in order to model economies of scale and the trend of cloud computing, we assume that the servers enjoy a cheaper price per unit of computation than the clients, parameterized by a constant factor, ρ.
-
-Determine the protocol design by a prize amount $P$ and probability $E$.
-Let $I$
-
-\begin{theorem}
-  For any valid parameters, $α, β⁺, β⁻$, characterizing the preference of the clients, there exists a lottery prize $P$ large enough that a unique Nash equilibrium exists such that the clients invest $X$ in mining.
-\end{theorem}
-\IEEEproof assumed \qed.
-
-Let $C_S$ be the amount of computational power invested by the servers, and $C_C$ be the amount invested by the clients. Let $P$ be the prize amount, and $E$ is the average time between epochs, and let $z$ be a bounded time of an interval during which decisions are made. The benefit of investing marginally additional more computing power must be equal to the marginal benefit 
 
 
 

@@ -30,7 +30,8 @@ def ideal_cloud_cost(E, k, b):
     seconds_per_month = 2.62974e6
     cost_per_byte = cost_per_mbps / seconds_per_month / 1e6 * 8 
     # Round trip latency (seconds)
-    latency = 0.030 # 30 ms, UMD to EC2 US.East
+    latency = 0.030+0.0005 # 30 ms, UMD to EC2 US.East
+
     L = latency
     if k == 1: print 'Ideal cloud cost per iter:',  (b * cost_per_byte)
     #cost = (1./efficiency(k, L, E)) * (k * 15 * cost_per_byte) # 15: cost for a single hash
@@ -54,7 +55,7 @@ def ssd_local_cost_sub4096(E, k, b):
 def graph1():
     x = np.arange(1,80000)
     E = 600 # 10 minutes
-    b = 4096
+    b = 128
     y1 = [ideal_cloud_cost(E, k, b) for k in x]
     y2 = [ssd_local_cost_sub4096(E, k, b) for k in x]
     clf()
@@ -64,3 +65,16 @@ def graph1():
     title('Effective cost per ticket vs iterations')
     xlabel('k (puzzle iterations)')
     ylabel('Effectve cost per ticket ($)')
+
+def signature_test(k=1024):
+    from signature import RSASignatureScheme
+    scheme = RSASignatureScheme(k)
+    pkey, skey = scheme.generate()
+    def gen():
+        return os.urandom(k/8)
+    def sign(m):
+        return scheme.sign(m, skey)
+    return gen, sign
+        
+    
+    
